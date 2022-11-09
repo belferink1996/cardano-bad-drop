@@ -11,22 +11,19 @@ const Home: NextPage = () => {
   return (
     <div className='App'>
       <Head>
-        <title>Bad Drop | Cardano</title>
-        <meta name='description' content='A tool to make airdrops on Cardano' />
-        <link rel='icon' href='/favicon.ico' />
+        <title>Bad Drop | Cardano Airdrop Tool</title>
+        <meta
+          name='description'
+          content='A tool designed to make airdrops on Cardano easy and accesible for everyone!'
+        />
+        <link rel='icon' href='https://badfoxmc.com/media/logo/white_filled.png' />
       </Head>
 
       <header>
-        <h1>Bad Drop</h1>
+        <h1>Bad Drop 🪂</h1>
       </header>
 
-      {connected ? (
-        <TheTool />
-      ) : (
-        <main>
-          <ConnectWallet />
-        </main>
-      )}
+      <main>{connected ? <TheTool /> : <ConnectWallet />}</main>
 
       <footer>
         <a

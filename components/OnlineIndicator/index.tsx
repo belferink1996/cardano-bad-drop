@@ -53,11 +53,11 @@ export default function OnlineIndicator({
   children: ReactNode
 }) {
   return online ? (
-    <OnlineBadge variant='dot' overlap='circular' anchorOrigin={{ vertical: 'top', horizontal: 'left' }}>
+    <OnlineBadge variant='dot' overlap='circular' anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
       {children}
     </OnlineBadge>
   ) : (
-    <OfflineBadge variant='dot' overlap='circular' anchorOrigin={{ vertical: 'top', horizontal: 'left' }}>
+    <OfflineBadge variant='dot' overlap='circular' anchorOrigin={{ vertical: 'top', horizontal: 'right' }}>
       {children}
     </OfflineBadge>
   )

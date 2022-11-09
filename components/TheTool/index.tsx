@@ -1,7 +1,8 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
-import { Transaction } from '@martifylabs/mesh'
 import writeXlsxFile from 'write-excel-file'
+import { Asset, Transaction } from '@martifylabs/mesh'
+import { Autocomplete, Button, FormControl, InputLabel, MenuItem, Select, TextField } from '@mui/material'
 import { useWallet } from '../../contexts/WalletContext'
 import OnlineIndicator from '../OnlineIndicator'
 
@@ -40,29 +41,22 @@ type SpreadsheetObject = {
 
 const TheTool = () => {
   const { wallet } = useWallet()
-  const [balance, setBalance] = useState(0)
 
-  useEffect(() => {
-    if (wallet?.getLovelace) {
-      ;(async () => {
-        const lovelace = await wallet?.getLovelace()
+  const [balances, setBalances] = useState<Asset[]>([])
+  const [selectedBalance, setSelectedBalance] = useState('')
 
-        if (lovelace) {
-          setBalance(Math.floor(Number(lovelace) / MILLION))
-        }
-      })()
-    }
-  }, [wallet])
-
-  const [transcripts, setTranscripts] = useState<Transcript[]>([])
   const [loading, setLoading] = useState(false)
   const [snapshotDone, setSnapshotDone] = useState(false)
   const [payoutDone, setPayoutDone] = useState(false)
-  const [listedCount, setListedCount] = useState(0)
-  const [unlistedCount, setUnlistedCount] = useState(0)
+
+  const [transcripts, setTranscripts] = useState<Transcript[]>([])
+
   const [holdingWallets, setHoldingWallets] = useState<Holder[]>([])
   const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
   const [payoutTxHash, setPayoutTxHash] = useState('')
+
+  const [listedCount, setListedCount] = useState(0)
+  const [unlistedCount, setUnlistedCount] = useState(0)
 
   const addTranscript = (msg: string, key?: string) => {
     setTranscripts((prev) => {
@@ -81,7 +75,20 @@ const TheTool = () => {
   }
 
   useEffect(() => {
-    addTranscript('Welcome Admin')
+    if (wallet?.getRewardAddresses) {
+      ;(async () => {
+        try {
+          const _stakeKeys = await wallet.getRewardAddresses()
+          addTranscript('Connected', _stakeKeys[0])
+
+          const _balances = await wallet.getBalance()
+          setBalances(_balances)
+        } catch (error: any) {
+          addTranscript('ERROR', error.message)
+          console.error(error)
+        }
+      })()
+    }
   }, [])
 
   const fetchOwningWallet = useCallback(async (assetId: string): Promise<FetchedOwner> => {
@@ -103,7 +110,7 @@ const TheTool = () => {
     }
   }, [])
 
-  const runSnapshot = useCallback(async () => {
+  const clickSnapshot = useCallback(async () => {
     setLoading(true)
 
     let unlistedCountForPayoutCalculation = 0
@@ -142,7 +149,7 @@ const TheTool = () => {
 
     setHoldingWallets(holders)
 
-    const holdersShare = balance * 0.8
+    const holdersShare = Number(balances.find(({ unit }) => unit === selectedBalance)?.quantity || 0) * 0.8
     const adaPerAsset = holdersShare / unlistedCountForPayoutCalculation
 
     setPayoutWallets(
@@ -158,91 +165,110 @@ const TheTool = () => {
     addTranscript('Done!')
     setSnapshotDone(true)
     setLoading(false)
-  }, [balance, fetchOwningWallet])
+  }, [selectedBalance, fetchOwningWallet])
 
-  const payEveryone = useCallback(async () => {
-    setLoading(true)
+  // const clickAirdrop = useCallback(async () => {
+  //   setLoading(true)
 
-    try {
-      const tx = new Transaction({ initiator: wallet })
+  //   try {
+  //     const tx = new Transaction({ initiator: wallet })
 
-      for (const { address, payout } of payoutWallets) {
-        tx.sendLovelace(address, String(payout * MILLION))
-      }
+  //     for (const { address, payout } of payoutWallets) {
+  //       tx.sendLovelace(address, String(payout * MILLION))
+  //     }
 
-      addTranscript('Building TX')
-      const unsignedTx = await tx.build()
-      addTranscript('Awaiting signature')
-      const signedTx = await wallet.signTx(unsignedTx)
-      addTranscript('Submitting TX')
-      const txHash = await wallet.submitTx(signedTx)
+  //     addTranscript('Building TX')
+  //     const unsignedTx = await tx.build()
+  //     addTranscript('Awaiting signature')
+  //     const signedTx = await wallet.signTx(unsignedTx)
+  //     addTranscript('Submitting TX')
+  //     const txHash = await wallet.submitTx(signedTx)
 
-      addTranscript('Done!', txHash)
-      setPayoutTxHash(txHash)
-      setPayoutDone(true)
-    } catch (error: any) {
-      addTranscript('ERROR', error.message)
-      console.error(error)
-    }
+  //     addTranscript('Done!', txHash)
+  //     setPayoutTxHash(txHash)
+  //     setPayoutDone(true)
+  //   } catch (error: any) {
+  //     addTranscript('ERROR', error.message)
+  //     console.error(error)
+  //   }
 
-    setLoading(false)
-  }, [wallet, payoutWallets])
+  //   setLoading(false)
+  // }, [wallet, payoutWallets])
 
-  const downloadReceipt = useCallback(async () => {
-    setLoading(true)
+  // const clickDownloadReceipt = useCallback(async () => {
+  //   setLoading(true)
 
-    const data: SpreadsheetObject[][] = [
-      [
-        {
-          value: 'Wallet Address',
-          fontWeight: 'bold',
-        },
-        {
-          value: 'Stake Key',
-          fontWeight: 'bold',
-        },
-        {
-          value: 'Payout',
-          fontWeight: 'bold',
-        },
-      ],
-    ]
+  //   const data: SpreadsheetObject[][] = [
+  //     [
+  //       {
+  //         value: 'Wallet Address',
+  //         fontWeight: 'bold',
+  //       },
+  //       {
+  //         value: 'Stake Key',
+  //         fontWeight: 'bold',
+  //       },
+  //       {
+  //         value: 'Payout',
+  //         fontWeight: 'bold',
+  //       },
+  //     ],
+  //   ]
 
-    for (const { address, stakeKey, payout } of payoutWallets) {
-      data.push([
-        {
-          type: String,
-          value: address,
-        },
-        {
-          type: String,
-          value: stakeKey,
-        },
-        {
-          type: Number,
-          value: payout,
-        },
-      ])
-    }
+  //   for (const { address, stakeKey, payout } of payoutWallets) {
+  //     data.push([
+  //       {
+  //         type: String,
+  //         value: address,
+  //       },
+  //       {
+  //         type: String,
+  //         value: stakeKey,
+  //       },
+  //       {
+  //         type: Number,
+  //         value: payout,
+  //       },
+  //     ])
+  //   }
 
-    try {
-      await writeXlsxFile<SpreadsheetObject>(data, {
-        fileName: `BadFoxMC Royalty Distribution (${new Date().toLocaleString()}) TX[${payoutTxHash}].xlsx`,
-        // @ts-ignore
-        columns: [{ width: 100 }, { width: 60 }, { width: 25 }],
-      })
-    } catch (error: any) {
-      addTranscript('ERROR', error.message)
-      console.error(error)
-    }
+  //   try {
+  //     await writeXlsxFile<SpreadsheetObject>(data, {
+  //       fileName: `Bad Drop (${new Date().toLocaleString()}) TX[${payoutTxHash}].xlsx`,
+  //       // @ts-ignore
+  //       columns: [{ width: 100 }, { width: 60 }, { width: 25 }],
+  //     })
+  //   } catch (error: any) {
+  //     addTranscript('ERROR', error.message)
+  //     console.error(error)
+  //   }
 
-    setLoading(false)
-  }, [payoutWallets, payoutTxHash])
+  //   setLoading(false)
+  // }, [payoutWallets, payoutTxHash])
 
   return (
-    <main>
+    <div>
       <div>
-        <p>Balance: {balance} ADA</p>
+        <FormControl variant='filled' fullWidth>
+          <InputLabel id='select-balance-label' style={{ color: 'var(--grey)' }}>
+            Choose a Balance
+          </InputLabel>
+          <Select
+            labelId='select-balance-label'
+            label='Choose a Balance'
+            sx={{ background: 'var(--grey-darker)', color: 'white' }}
+            value={selectedBalance}
+            onChange={(e) => setSelectedBalance(e.target.value)}
+          >
+            {balances.map(({ unit, quantity }) =>
+              unit === 'lovelace' ? (
+                <MenuItem key={`unit-${unit}`} value={unit}>
+                  {unit} ({quantity})
+                </MenuItem>
+              ) : null
+            )}
+          </Select>
+        </FormControl>
       </div>
 
       <div
@@ -279,23 +305,38 @@ const TheTool = () => {
         })}
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-evenly' }}>
+      <div style={{ display: 'flex', flexFlow: 'row wrap', alignItems: 'center', justifyContent: 'space-evenly' }}>
         <OnlineIndicator online={!snapshotDone && !payoutDone && !loading}>
-          <button onClick={runSnapshot} disabled={snapshotDone || payoutDone || loading}>
-            Run Snapshot
-          </button>
+          <Button
+            variant='contained'
+            style={{ backgroundColor: 'var(--grey)' }}
+            disabled={snapshotDone || payoutDone || loading}
+            onClick={clickSnapshot}
+          >
+            Snapshot
+          </Button>
         </OnlineIndicator>
 
         <OnlineIndicator online={snapshotDone && !payoutDone && !loading}>
-          <button onClick={payEveryone} disabled={!snapshotDone || payoutDone || loading}>
-            Pay Everyone
-          </button>
+          <Button
+            variant='contained'
+            style={{ backgroundColor: 'var(--grey)' }}
+            disabled={!snapshotDone || payoutDone || loading}
+            // onClick={clickAirdrop}
+          >
+            Airdrop
+          </Button>
         </OnlineIndicator>
 
         <OnlineIndicator online={snapshotDone && payoutDone && !loading}>
-          <button onClick={downloadReceipt} disabled={!payoutDone || loading}>
+          <Button
+            variant='contained'
+            style={{ backgroundColor: 'var(--grey)' }}
+            disabled={!payoutDone || loading}
+            // onClick={clickDownloadReceipt}
+          >
             Download Receipt
-          </button>
+          </Button>
         </OnlineIndicator>
       </div>
 
@@ -322,7 +363,7 @@ const TheTool = () => {
           </tbody>
         </table>
       ) : null}
-    </main>
+    </div>
   )
 }
 
