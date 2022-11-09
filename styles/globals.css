@@ -1,26 +1,56 @@
-html,
-body {
+:root {
+  --grey: rgb(90, 90, 90);
+  --grey-darker: rgb(50, 50, 50);
+  --grey-darkest: rgb(40, 40, 40);
+}
+
+* {
   padding: 0;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
-    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans,
+    Droid Sans, Helvetica Neue, sans-serif;
+}
+html {
+  color-scheme: dark;
+}
+body {
+  background: var(--grey-darkest);
+  color: whitesmoke;
+}
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header,
+footer {
+  width: 100%;
+  min-height: 70px;
+  padding: 1rem;
+  background: var(--grey-darker);
+
+  display: flex;
+  align-items: center;
+}
+header {
+  border-bottom: 1px solid black;
+  justify-content: space-between;
+}
+footer {
+  border-top: 1px solid black;
+  justify-content: center;
 }
 
 a {
   color: inherit;
   text-decoration: none;
-}
-
-* {
-  box-sizing: border-box;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
-  body {
-    color: white;
-    background: black;
-  }
 }
