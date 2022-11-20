@@ -1,6 +1,5 @@
 import { useRouter } from 'next/router'
 import { Fragment, useState } from 'react'
-import { useScreenSize } from '../../contexts/ScreenSizeContext'
 import { useWallet } from '../../contexts/WalletContext'
 import Modal from '../Modal'
 import Loader from '../Loader'
@@ -9,7 +8,6 @@ import { Button } from '@mui/material'
 
 export default function ConnectWallet() {
   const router = useRouter()
-  const { isMobile } = useScreenSize()
   const { availableWallets, connectWallet, connecting, connected, connectedName } = useWallet()
   const [openModal, setOpenModal] = useState<boolean>(false)
 
@@ -17,7 +15,7 @@ export default function ConnectWallet() {
     <Fragment>
       <Button
         variant='contained'
-        color='primary'
+        color='secondary'
         onClick={() => {
           if (connected) {
             router.push('/wallet')

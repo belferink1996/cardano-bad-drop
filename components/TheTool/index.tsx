@@ -42,21 +42,23 @@ type SpreadsheetObject = {
 const TheTool = () => {
   const { wallet } = useWallet()
 
-  const [balances, setBalances] = useState<Asset[]>([])
-  const [selectedBalance, setSelectedBalance] = useState('')
-
-  const [loading, setLoading] = useState(false)
-  const [snapshotDone, setSnapshotDone] = useState(false)
-  const [payoutDone, setPayoutDone] = useState(false)
-
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
+  const [listedCount, setListedCount] = useState<number>(0)
+  const [unlistedCount, setUnlistedCount] = useState<number>(0)
+
+  const [blockfrostKey, setBlockfrostKey] = useState<string>('')
+  const [policyId, setPolicyId] = useState<string>('')
+
+  const [balances, setBalances] = useState<Asset[]>([])
+  const [selectedBalance, setSelectedBalance] = useState<string>('')
+
+  const [loading, setLoading] = useState<boolean>(false)
+  const [snapshotDone, setSnapshotDone] = useState<boolean>(false)
+  const [payoutDone, setPayoutDone] = useState<boolean>(false)
 
   const [holdingWallets, setHoldingWallets] = useState<Holder[]>([])
   const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
-  const [payoutTxHash, setPayoutTxHash] = useState('')
-
-  const [listedCount, setListedCount] = useState(0)
-  const [unlistedCount, setUnlistedCount] = useState(0)
+  const [payoutTxHash, setPayoutTxHash] = useState<string>('')
 
   const addTranscript = (msg: string, key?: string) => {
     setTranscripts((prev) => {
@@ -78,11 +80,11 @@ const TheTool = () => {
     if (wallet?.getRewardAddresses) {
       ;(async () => {
         try {
-          const _stakeKeys = await wallet.getRewardAddresses()
-          addTranscript('Connected', _stakeKeys[0])
-
           const _balances = await wallet.getBalance()
+          const _stakeKeys = await wallet.getRewardAddresses()
+
           setBalances(_balances)
+          addTranscript('Connected', _stakeKeys[0])
         } catch (error: any) {
           addTranscript('ERROR', error.message)
           console.error(error)
@@ -91,24 +93,37 @@ const TheTool = () => {
     }
   }, [])
 
-  const fetchOwningWallet = useCallback(async (assetId: string): Promise<FetchedOwner> => {
-    try {
-      const {
-        data,
-      }: {
-        data: {
-          assetId: string
-          stakeKey: string
-          walletAddress: string
-        }
-      } = await axios.get(`/api/walle?blockfrostKey=${''}&assetId=${assetId}`)
+  const isUserSettingsExist = useCallback(
+    () => !!(blockfrostKey && policyId && selectedBalance),
+    [blockfrostKey, policyId, selectedBalance]
+  )
 
-      return data
-    } catch (error: any) {
-      addTranscript('ERROR', error.message)
-      return await fetchOwningWallet(assetId)
-    }
-  }, [])
+  const fetchOwningWallet = useCallback(
+    async (assetId: string): Promise<FetchedOwner | null> => {
+      try {
+        const {
+          data,
+        }: {
+          data: {
+            assetId: string
+            stakeKey: string
+            walletAddress: string
+          }
+        } = await axios.get(`/api/wallet?blockfrostKey=${blockfrostKey}&assetId=${assetId}`)
+
+        return data
+      } catch (error: any) {
+        if (error?.response?.status === 401) {
+          addTranscript('ERROR', 'Bad Blockfrost Key!')
+          return null
+        } else {
+          addTranscript('ERROR', error.message)
+          return await fetchOwningWallet(assetId)
+        }
+      }
+    },
+    [blockfrostKey]
+  )
 
   const clickSnapshot = useCallback(async () => {
     setLoading(true)
@@ -121,7 +136,10 @@ const TheTool = () => {
       const { assetId } = collectionAssets[i]
       addTranscript(`Processing ${i + 1} / ${collectionAssets.length}`, assetId)
 
-      const { stakeKey, walletAddress } = await fetchOwningWallet(assetId)
+      const wallet = await fetchOwningWallet(assetId)
+      if (!wallet) return // for managed error (like bad blockfrost key)
+
+      const { stakeKey, walletAddress } = wallet
 
       if (!EXCLUDE_ADDRESSES.includes(walletAddress)) {
         const holderIndex = holders.findIndex((item) => item.stakeKey === stakeKey)
@@ -246,29 +264,70 @@ const TheTool = () => {
   //   setLoading(false)
   // }, [payoutWallets, payoutTxHash])
 
+  const styles = {
+    inpWrap: {
+      maxWidth: '420px',
+      margin: '0.5rem auto',
+    },
+    inp: {
+      borderRadius: '0.5rem',
+    },
+  }
+
   return (
     <div>
       <div>
-        <FormControl variant='filled' fullWidth>
-          <InputLabel id='select-balance-label' style={{ color: 'var(--grey)' }}>
-            Choose a Balance
-          </InputLabel>
-          <Select
-            labelId='select-balance-label'
-            label='Choose a Balance'
-            sx={{ background: 'var(--grey-darker)', color: 'white' }}
-            value={selectedBalance}
-            onChange={(e) => setSelectedBalance(e.target.value)}
-          >
-            {balances.map(({ unit, quantity }) =>
-              unit === 'lovelace' ? (
-                <MenuItem key={`unit-${unit}`} value={unit}>
-                  {unit} ({quantity})
-                </MenuItem>
-              ) : null
-            )}
-          </Select>
-        </FormControl>
+        <div style={styles.inpWrap}>
+          <TextField
+            label='Blockfrost Key'
+            variant='filled'
+            size='small'
+            fullWidth
+            style={styles.inp}
+            value={blockfrostKey}
+            onChange={(e) => setBlockfrostKey(e.target.value)}
+          />
+          {/* How to get key */}
+        </div>
+
+        <div style={styles.inpWrap}>
+          <TextField
+            label='Policy ID'
+            variant='filled'
+            size='small'
+            fullWidth
+            style={styles.inp}
+            value={policyId}
+            onChange={(e) => setPolicyId(e.target.value)}
+          />
+          {/* Disclaimer: 100% unlisted holders */}
+        </div>
+
+        <div style={styles.inpWrap}>
+          <FormControl variant='filled' size='small' fullWidth style={styles.inp}>
+            <InputLabel id='select-balance-label'>Balance</InputLabel>
+            <Select
+              labelId='select-balance-label'
+              label='Balance'
+              value={selectedBalance}
+              onChange={(e) => setSelectedBalance(e.target.value)}
+            >
+              {balances.map(({ unit, quantity }) =>
+                unit === 'lovelace' ? (
+                  <MenuItem key={`unit-${unit}`} value={unit}>
+                    {unit} ({quantity})
+                  </MenuItem>
+                ) : null
+              )}
+            </Select>
+          </FormControl>
+
+          {/* 
+        
+          Fixed amount   OR   percent
+        
+          */}
+        </div>
       </div>
 
       <div
@@ -306,11 +365,11 @@ const TheTool = () => {
       </div>
 
       <div style={{ display: 'flex', flexFlow: 'row wrap', alignItems: 'center', justifyContent: 'space-evenly' }}>
-        <OnlineIndicator online={!snapshotDone && !payoutDone && !loading}>
+        <OnlineIndicator online={!snapshotDone && !payoutDone && !loading && isUserSettingsExist()}>
           <Button
             variant='contained'
-            style={{ backgroundColor: 'var(--grey)' }}
-            disabled={snapshotDone || payoutDone || loading}
+            color='secondary'
+            disabled={snapshotDone || payoutDone || loading || !isUserSettingsExist()}
             onClick={clickSnapshot}
           >
             Snapshot
@@ -320,7 +379,7 @@ const TheTool = () => {
         <OnlineIndicator online={snapshotDone && !payoutDone && !loading}>
           <Button
             variant='contained'
-            style={{ backgroundColor: 'var(--grey)' }}
+            color='secondary'
             disabled={!snapshotDone || payoutDone || loading}
             // onClick={clickAirdrop}
           >
@@ -331,7 +390,7 @@ const TheTool = () => {
         <OnlineIndicator online={snapshotDone && payoutDone && !loading}>
           <Button
             variant='contained'
-            style={{ backgroundColor: 'var(--grey)' }}
+            color='secondary'
             disabled={!payoutDone || loading}
             // onClick={clickDownloadReceipt}
           >

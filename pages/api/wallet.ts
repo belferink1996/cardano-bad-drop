@@ -56,6 +56,12 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
     }
   } catch (error) {
     console.error(error)
+
+    // @ts-ignore
+    if (error?.status_code === 403 || error?.message === 'Invalid project token.') {
+      return res.status(401).end('Unauthorized')
+    }
+
     return res.status(500).end('Internal Server Error')
   }
 }
