@@ -2,20 +2,15 @@ import { NextApiRequest, NextApiResponse } from 'next'
 import { BlockFrostAPI } from '@blockfrost/blockfrost-js'
 
 type Response = {
-  isContract: boolean
-  stakeKey: string
-  walletAddress: string
-  assets: {
-    unit: string
-    quantity: string
-  }[]
-}
+  asset: string
+  quantity: string
+}[]
 
 const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
   try {
     const {
       method,
-      query: { blockfrostKey, assetId },
+      query: { blockfrostKey, policyId },
     } = req
 
     if (!blockfrostKey || typeof blockfrostKey !== 'string') {
@@ -29,30 +24,17 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
 
     switch (method) {
       case 'GET': {
-        if (!assetId || typeof assetId !== 'string') {
+        if (!policyId || typeof policyId !== 'string') {
           return res.status(400).end('Bad Request')
         }
 
-        console.log('Fetching wallet information with asset ID:', assetId)
+        console.log('Fetching assets with policy ID:', policyId)
 
-        const assetAddresses = await blockfrost.assetsAddresses(assetId)
-        const walletAddress = assetAddresses[0]?.address ?? ''
+        const data = await blockfrost.assetsPolicyByIdAll(policyId)
 
-        const addressInfo = await blockfrost.addresses(walletAddress)
-        const isContract = addressInfo.script
-        const stakeKey = addressInfo.stake_address || ''
-        const assets = addressInfo.amount
+        console.log('Fetched assets:', data)
 
-        const payload = {
-          isContract,
-          stakeKey,
-          walletAddress,
-          assets,
-        }
-
-        console.log('Fetched wallet information:', payload)
-
-        return res.status(200).json(payload)
+        return res.status(200).json(data)
       }
 
       default: {

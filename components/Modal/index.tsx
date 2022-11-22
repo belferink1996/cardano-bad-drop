@@ -1,6 +1,5 @@
 import { CSSProperties, ReactNode } from 'react'
 import { Modal as MuiModal, IconButton, Typography, Fade } from '@mui/material'
-import { useScreenSize } from '../../contexts/ScreenSizeContext'
 
 const Modal = ({
   open = false,
@@ -15,8 +14,6 @@ const Modal = ({
   style?: CSSProperties
   children: ReactNode
 }) => {
-  const { isMobile } = useScreenSize()
-
   return (
     <MuiModal
       open={open}
@@ -25,27 +22,29 @@ const Modal = ({
     >
       <Fade in={open}>
         <div
-          className='scroll'
           style={{
-            cursor: 'unset',
-            maxWidth: '100vw',
-            minWidth: isMobile ? '100vw' : '420px',
-            width: isMobile ? '100%' : 'fit-content',
-            minHeight: isMobile ? '100vh' : 'fit-content',
-            maxHeight: isMobile ? '100vh' : '90vh',
+            minWidth: '420px',
+            width: 'fit-content',
+            height: 'fit-content',
             padding: '1rem',
-            borderRadius: isMobile ? '0' : '1rem',
+
             backgroundColor: 'var(--grey-darkest)',
+            borderRadius: '0.5rem',
+
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             position: 'relative',
+
+            cursor: 'unset',
             ...style,
           }}
         >
           {onClose ? (
             <IconButton
               sx={{
+                width: '2.5rem',
+                height: '2.5rem',
                 margin: '0.5rem',
                 color: 'orange',
                 fontSize: '2rem',

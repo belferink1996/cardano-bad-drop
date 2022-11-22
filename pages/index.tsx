@@ -1,13 +1,9 @@
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
-import { useWallet } from '../contexts/WalletContext'
-import ConnectWallet from '../components/ConnectWallet'
 import TheTool from '../components/TheTool'
 
 const Home: NextPage = () => {
-  const { connected } = useWallet()
-
   return (
     <div className='App'>
       <Head>
@@ -23,7 +19,10 @@ const Home: NextPage = () => {
         <h1>Bad Drop 🪂</h1>
       </header>
 
-      <main>{connected ? <TheTool /> : <ConnectWallet />}</main>
+      {/* <main>{connected ? <TheTool /> : <ConnectWallet />}</main> */}
+      <main>
+        <TheTool />
+      </main>
 
       <footer>
         <a
