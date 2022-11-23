@@ -541,7 +541,7 @@ const TheTool = () => {
               size='small'
               fullWidth
               style={styles.inp}
-              disabled={!connected}
+              disabled={!connected || loading || snapshotDone}
               value={blockfrostKey}
               onChange={(e) => setBlockfrostKey(e.target.value)}
             />
@@ -576,7 +576,7 @@ const TheTool = () => {
               size='small'
               fullWidth
               style={styles.inp}
-              disabled={!connected}
+              disabled={!connected || loading || snapshotDone}
               value={policyId}
               onChange={(e) => setPolicyId(e.target.value)}
             />
@@ -584,7 +584,13 @@ const TheTool = () => {
         </div>
 
         <div style={styles.tokenInpSection}>
-          <FormControl variant='filled' size='small' fullWidth style={styles.inp} disabled={!connected}>
+          <FormControl
+            variant='filled'
+            size='small'
+            fullWidth
+            style={styles.inp}
+            disabled={!connected || loading || snapshotDone}
+          >
             <InputLabel id='token-select-label'>{selectedToken ? 'Selected Token' : 'Select a Token'}</InputLabel>
             <Select
               labelId='token-select-label'
@@ -608,7 +614,7 @@ const TheTool = () => {
           </FormControl>
 
           <div style={styles.tokenAmountWrap}>
-            <FormControl disabled={!selectedToken}>
+            <FormControl disabled={!selectedToken || loading || snapshotDone}>
               <RadioGroup
                 row
                 name='token-amount-type'
@@ -628,7 +634,7 @@ const TheTool = () => {
                 size='small'
                 fullWidth
                 style={styles.inp}
-                disabled={!tokenAmountType}
+                disabled={!tokenAmountType || loading || snapshotDone}
                 focused={!!tokenAmountType}
                 placeholder={
                   tokenAmountType === 'Fixed' ? '1,000,000' : tokenAmountType === 'Percent' ? '100%' : ''
