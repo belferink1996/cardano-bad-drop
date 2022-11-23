@@ -2,6 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  api: {
+    responseLimit: false,
+  },
   images: {
     domains: ['badfoxmc.com'],
   },
