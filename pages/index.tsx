@@ -1,9 +1,14 @@
+import { Button } from '@mui/material'
 import type { NextPage } from 'next'
 import Head from 'next/head'
 import Image from 'next/image'
+import { useState } from 'react'
+import Modal from '../components/Modal'
 import TheTool from '../components/TheTool'
 
 const Home: NextPage = () => {
+  const [showVid, setShowVid] = useState(false)
+
   return (
     <div className='App'>
       <Head>
@@ -17,12 +22,37 @@ const Home: NextPage = () => {
 
       <header>
         <h1>Bad Drop 🪂</h1>
+
+        <div style={{ display: 'flex' }}>
+          <Button variant='contained' color='primary' style={{ margin: 2 }} onClick={() => setShowVid(true)}>
+            Tutorial
+          </Button>
+          <Button
+            variant='contained'
+            color='primary'
+            style={{ margin: 2 }}
+            onClick={() => window.open('https://github.com/belferink1996/cardano-bad-drop', '_blank')}
+          >
+            Source Code
+          </Button>
+        </div>
       </header>
 
-      {/* <main>{connected ? <TheTool /> : <ConnectWallet />}</main> */}
       <main>
         <TheTool />
       </main>
+
+      <Modal open={showVid} onClose={() => setShowVid(false)} style={{ padding: '3rem' }}>
+        <iframe
+          width='560'
+          height='315'
+          src='https://www.youtube.com/embed/JteReIm9Sv8'
+          title='YouTube video player'
+          frameBorder='0'
+          allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
+          allowFullScreen
+        ></iframe>
+      </Modal>
 
       <footer>
         <a
