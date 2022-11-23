@@ -12,16 +12,16 @@ type Response = {
 }
 
 const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
+  const {
+    method,
+    query: { blockfrostKey, assetId },
+  } = req
+
+  if (!blockfrostKey || typeof blockfrostKey !== 'string') {
+    return res.status(401).end('Unauthorized')
+  }
+
   try {
-    const {
-      method,
-      query: { blockfrostKey, assetId },
-    } = req
-
-    if (!blockfrostKey || typeof blockfrostKey !== 'string') {
-      return res.status(401).end('Unauthorized')
-    }
-
     const blockfrost = new BlockFrostAPI({
       projectId: blockfrostKey,
       debug: true,

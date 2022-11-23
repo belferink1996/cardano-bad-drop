@@ -53,6 +53,12 @@ type Payout = {
   stakeKey: string
   address: string
   payout: number
+  txHash?: string
+}
+
+type TxStatus = {
+  txHash: string
+  submitted: boolean
 }
 
 type SpreadsheetObject = {
@@ -71,9 +77,7 @@ const TheTool = () => {
   const [unlistedCount, setUnlistedCount] = useState<number>(0)
 
   const [tokens, setTokens] = useState<Asset[]>([])
-  // const [holdingWallets, setHoldingWallets] = useState<Holder[]>([])
   const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
-  const [payoutTxHash, setPayoutTxHash] = useState<string>('')
 
   const [blockfrostKey, setBlockfrostKey] = useState<string>('')
   const [policyId, setPolicyId] = useState<string>('')
@@ -245,8 +249,6 @@ const TheTool = () => {
       }
     }
 
-    // setHoldingWallets(holders)
-
     const totalPool =
       tokenAmountType === 'Fixed'
         ? tokenFixedAmount
@@ -279,45 +281,115 @@ const TheTool = () => {
     fetchOwningWallet,
   ])
 
-  const clickAirdrop = useCallback(async () => {
-    setLoading(true)
+  // @ts-ignore
+  const getTxWithHash = useCallback(
+    async (_txHash: string): Promise<TxStatus> => {
+      try {
+        const {
+          data,
+        }: {
+          data: TxStatus
+        } = await axios.get(`/api/tx?blockfrostKey=${blockfrostKey}&txHash=${_txHash}`)
 
-    try {
-      const tx = new Transaction({ initiator: wallet })
+        if (data.submitted) {
+          return data
+        } else {
+          await sleep(1000)
+          return await getTxWithHash(_txHash)
+        }
+      } catch (error: any) {
+        if (error?.response?.status === 401) {
+          throw new Error('Bad Blockfrost Key!')
+        } else {
+          await sleep(1000)
+          addTranscript('ERROR', error.message)
+          return await getTxWithHash(_txHash)
+        }
+      }
+    },
+    [blockfrostKey]
+  )
 
-      for (const { address, payout } of payoutWallets) {
-        if (selectedToken === 'lovelace') {
-          if (payout >= MILLION) {
-            tx.sendLovelace(address, String(payout))
-          } else if (
-            window.confirm(
-              `Cardano requires at least 1 ADA per TX.\n\nThis wallet has only ${(payout / MILLION).toFixed(
-                2
-              )} ADA assigned to it:\n${address}\n\nClick OK if you want to increase the payout for this wallet to 1 ADA.\nClick cancel to exclude this wallet from the airdrop.\n\nNote: accepting will increase the total pool size.`
-            )
-          ) {
-            tx.sendLovelace(address, String(MILLION))
+  const clickAirdrop = useCallback(
+    async (difference?: number): Promise<any> => {
+      setLoading(true)
+
+      if (!difference) {
+        addTranscript('Batching TXs', 'This may take a moment...')
+      }
+
+      const batchSize = difference ? Math.floor(difference * payoutWallets.length) : payoutWallets.length
+      const batches: Payout[][] = []
+
+      for (let i = 0; i < payoutWallets.length; i += batchSize) {
+        batches.push(payoutWallets.slice(i, (i / batchSize + 1) * batchSize))
+      }
+
+      try {
+        for await (const [idx, batch] of batches.entries()) {
+          const tx = new Transaction({ initiator: wallet })
+
+          for (const { address, payout } of batch) {
+            if (selectedToken === 'lovelace') {
+              if (payout < MILLION) {
+                const str1 = 'Cardano requires at least 1 ADA per TX.'
+                const str2 = `This wallet has only ${(payout / MILLION).toFixed(
+                  2
+                )} ADA assigned to it:\n${address}`
+                const str3 = 'Click OK if you want to increase the payout for this wallet to 1 ADA.'
+                const str4 = 'Click cancel to exclude this wallet from the airdrop.'
+                const str5 = 'Note: accepting will increase the total pool size.'
+
+                if (window.confirm(`${str1}\n\n${str2}\n\n${str3}\n${str4}\n\n${str5}`)) {
+                  tx.sendLovelace(address, String(MILLION))
+                }
+              } else {
+                tx.sendLovelace(address, String(payout))
+              }
+            }
           }
+
+          const unsignedTx = await tx.build()
+          addTranscript(`Building TX ${idx + 1} of ${batches.length}`)
+          const signedTx = await wallet.signTx(unsignedTx)
+          const txHash = await wallet.submitTx(signedTx)
+          addTranscript('Awaiting network confirmation', 'This may take a moment...')
+          await getTxWithHash(txHash)
+          addTranscript('Confirmed!', txHash)
+
+          setPayoutWallets((prev) =>
+            prev.map((prevItem) =>
+              batch.some(({ stakeKey }) => stakeKey === prevItem.stakeKey)
+                ? {
+                    ...prevItem,
+                    txHash,
+                  }
+                : prevItem
+            )
+          )
+        }
+
+        addTranscript('Airdrop done!', "You can now leave the app, don't forget to download the receipt 👍")
+        setPayoutDone(true)
+      } catch (error: any) {
+        console.error(error)
+
+        if ((error.message as string).indexOf('Maximum transaction size') !== -1) {
+          // [Transaction] An error occurred during build: Maximum transaction size of 16384 exceeded. Found: 21861.
+          const splitMessage: string[] = error.message.split(' ')
+          const [max, curr] = splitMessage.filter((str) => !isNaN(Number(str))).map((str) => Number(str))
+          // [16384, 21861]
+
+          return await clickAirdrop((difference || 1) * (max / curr))
+        } else {
+          addTranscript('ERROR', error.message)
         }
       }
 
-      addTranscript('Building TX')
-      const unsignedTx = await tx.build()
-      addTranscript('Awaiting signature')
-      const signedTx = await wallet.signTx(unsignedTx)
-      addTranscript('Submitting TX')
-      const txHash = await wallet.submitTx(signedTx)
-
-      addTranscript('Airdrop done!', txHash)
-      setPayoutTxHash(txHash)
-      setPayoutDone(true)
-    } catch (error: any) {
-      addTranscript('ERROR', error.message)
-      console.error(error)
-    }
-
-    setLoading(false)
-  }, [selectedToken, wallet, payoutWallets])
+      setLoading(false)
+    },
+    [wallet, payoutWallets, selectedToken, getTxWithHash]
+  )
 
   const clickDownloadReceipt = useCallback(async () => {
     setLoading(true)
@@ -336,10 +408,14 @@ const TheTool = () => {
           value: 'Payout',
           fontWeight: 'bold',
         },
+        {
+          value: 'Transaction Hash',
+          fontWeight: 'bold',
+        },
       ],
     ]
 
-    for (const { address, stakeKey, payout } of payoutWallets) {
+    for (const { address, stakeKey, payout, txHash } of payoutWallets) {
       data.push([
         {
           type: String,
@@ -350,17 +426,21 @@ const TheTool = () => {
           value: stakeKey,
         },
         {
-          type: Number,
+          type: String,
           value: (selectedToken === 'lovelace' ? payout / MILLION : payout).toFixed(2),
+        },
+        {
+          type: String,
+          value: txHash || '',
         },
       ])
     }
 
     try {
       await writeXlsxFile<SpreadsheetObject>(data, {
-        fileName: `Bad Drop (${new Date().toLocaleString()}) TX[${payoutTxHash}].xlsx`,
+        fileName: `Bad Drop (${new Date().toLocaleDateString()}).xlsx`,
         // @ts-ignore
-        columns: [{ width: 100 }, { width: 60 }, { width: 25 }],
+        columns: [{ width: 100 }, { width: 60 }, { width: 25 }, { width: 60 }],
       })
     } catch (error: any) {
       addTranscript('ERROR', error.message)
@@ -368,7 +448,7 @@ const TheTool = () => {
     }
 
     setLoading(false)
-  }, [selectedToken, payoutWallets, payoutTxHash])
+  }, [payoutWallets, selectedToken])
 
   const [blockfrostKeyPopoverEl, setBlockfrostKeyPopoverEl] = useState<Element | null>(null)
   const [policyIdPopoverEl, setPolicyIdPopoverEl] = useState<Element | null>(null)
@@ -562,7 +642,6 @@ const TheTool = () => {
                 }
                 onChange={(e) => {
                   const v = Number(e.target.value)
-
                   if (!isNaN(v)) {
                     tokenAmountType === 'Fixed' && v >= 0 && v <= tokenQuantity
                       ? setTokenFixedAmount(v)
@@ -572,6 +651,7 @@ const TheTool = () => {
                   }
                 }}
               />
+
               {selectedToken === 'lovelace' ? (
                 <p style={{ marginTop: '0.1rem', fontSize: '0.9rem' }}>
                   Translates to:{' '}
@@ -613,7 +693,7 @@ const TheTool = () => {
 
       <div style={{ display: 'flex', flexFlow: 'row wrap', alignItems: 'center', justifyContent: 'space-evenly' }}>
         <OnlineIndicator online={!connected}>
-          <ConnectWallet />
+          <ConnectWallet addTranscript={addTranscript} />
         </OnlineIndicator>
 
         <OnlineIndicator online={!snapshotDone && !payoutDone && !loading && isUserSettingsExist()}>
@@ -632,7 +712,7 @@ const TheTool = () => {
             variant='contained'
             color='secondary'
             disabled={!snapshotDone || payoutDone || loading}
-            onClick={clickAirdrop}
+            onClick={() => clickAirdrop()}
           >
             Airdrop
           </Button>
@@ -659,15 +739,17 @@ const TheTool = () => {
         <table style={{ margin: '0 auto' }}>
           <thead>
             <tr>
-              <th style={{ width: 100 }}>Payout</th>
+              <th>Payout</th>
               <th>Stake Key</th>
+              <th>TX Hash</th>
             </tr>
           </thead>
           <tbody>
-            {payoutWallets.map(({ stakeKey, payout }) => (
+            {payoutWallets.map(({ stakeKey, payout, txHash }) => (
               <tr key={stakeKey}>
                 <td>{selectedToken === 'lovelace' ? `${(payout / MILLION).toFixed(2)} ADA` : payout}</td>
-                <td>{stakeKey}</td>
+                <td style={{ margin: '0 0.5rem' }}>{stakeKey}</td>
+                <td>{txHash || ''}</td>
               </tr>
             ))}
           </tbody>
