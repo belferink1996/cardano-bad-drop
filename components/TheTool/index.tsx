@@ -187,7 +187,7 @@ const TheTool = () => {
         }
       }
     },
-    [blockfrostKey]
+    [blockfrostKey, policyId]
   )
 
   const clickSnapshot = useCallback(async () => {
