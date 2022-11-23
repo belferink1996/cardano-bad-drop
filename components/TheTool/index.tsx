@@ -174,7 +174,7 @@ const TheTool = () => {
           data,
         }: {
           data: FetchedOwner
-        } = await axios.get(`/api/wallet?blockfrostKey=${blockfrostKey}&assetId=${_assetId}`)
+        } = await axios.get(`/api/wallet?blockfrostKey=${blockfrostKey}&assetId=${_assetId}&policyId=${policyId}`)
 
         return data
       } catch (error: any) {

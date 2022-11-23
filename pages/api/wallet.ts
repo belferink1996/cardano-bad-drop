@@ -14,7 +14,7 @@ type Response = {
 const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
   const {
     method,
-    query: { blockfrostKey, assetId },
+    query: { blockfrostKey, assetId, policyId },
   } = req
 
   if (!blockfrostKey || typeof blockfrostKey !== 'string') {
@@ -29,7 +29,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
 
     switch (method) {
       case 'GET': {
-        if (!assetId || typeof assetId !== 'string') {
+        if (!assetId || typeof assetId !== 'string' || !policyId || typeof policyId !== 'string') {
           return res.status(400).end('Bad Request')
         }
 
@@ -41,7 +41,7 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
         const addressInfo = await blockfrost.addresses(walletAddress)
         const isContract = addressInfo.script
         const stakeKey = addressInfo.stake_address || ''
-        const assets = addressInfo.amount
+        const assets = addressInfo.amount.filter(({ unit }) => unit.indexOf(policyId) === 0)
 
         const payload = {
           isContract,
