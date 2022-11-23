@@ -754,7 +754,7 @@ const TheTool = () => {
             {payoutWallets.map(({ stakeKey, payout, txHash }) => (
               <tr key={stakeKey}>
                 <td>{selectedToken === 'lovelace' ? `${(payout / MILLION).toFixed(2)} ADA` : payout}</td>
-                <td style={{ margin: '0 0.5rem' }}>{stakeKey}</td>
+                <td style={{ padding: '0 1rem' }}>{stakeKey}</td>
                 <td>{txHash || ''}</td>
               </tr>
             ))}
