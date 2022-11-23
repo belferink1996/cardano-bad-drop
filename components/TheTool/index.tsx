@@ -122,8 +122,8 @@ const TheTool = () => {
             "We currently support ADA/Lovelace. Other FT's will be supported upon request."
           )
         } catch (error: any) {
-          addTranscript('ERROR', error.message)
           console.error(error)
+          addTranscript('ERROR', error.message)
         }
       } else {
         addTranscript('Welcome', 'Please connect with the wallet you want to airdrop with.')
@@ -155,6 +155,7 @@ const TheTool = () => {
 
         return data
       } catch (error: any) {
+        console.error(error)
         if (error?.response?.status === 401) {
           addTranscript('ERROR', 'Bad Blockfrost Key!')
           return null
@@ -178,6 +179,7 @@ const TheTool = () => {
 
         return data
       } catch (error: any) {
+        console.error(error)
         if (error?.response?.status === 401) {
           addTranscript('ERROR', 'Bad Blockfrost Key!')
           return null
@@ -282,7 +284,7 @@ const TheTool = () => {
   ])
 
   // @ts-ignore
-  const getTxWithHash = useCallback(
+  const txConfirmation = useCallback(
     async (_txHash: string): Promise<TxStatus> => {
       try {
         const {
@@ -295,15 +297,16 @@ const TheTool = () => {
           return data
         } else {
           await sleep(1000)
-          return await getTxWithHash(_txHash)
+          return await txConfirmation(_txHash)
         }
       } catch (error: any) {
+        console.error(error)
         if (error?.response?.status === 401) {
           throw new Error('Bad Blockfrost Key!')
         } else {
-          await sleep(1000)
           addTranscript('ERROR', error.message)
-          return await getTxWithHash(_txHash)
+          await sleep(1000)
+          return await txConfirmation(_txHash)
         }
       }
     },
@@ -354,7 +357,7 @@ const TheTool = () => {
           const signedTx = await wallet.signTx(unsignedTx)
           const txHash = await wallet.submitTx(signedTx)
           addTranscript('Awaiting network confirmation', 'This may take a moment...')
-          await getTxWithHash(txHash)
+          await txConfirmation(txHash)
           addTranscript('Confirmed!', txHash)
 
           setPayoutWallets((prev) =>
@@ -378,7 +381,7 @@ const TheTool = () => {
           // [Transaction] An error occurred during build: Maximum transaction size of 16384 exceeded. Found: 21861.
           const splitMessage: string[] = error.message.split(' ')
           const [max, curr] = splitMessage.filter((str) => !isNaN(Number(str))).map((str) => Number(str))
-          // [16384, 21861]
+          // [16384, 21861]n
 
           return await clickAirdrop((difference || 1) * (max / curr))
         } else {
@@ -388,7 +391,7 @@ const TheTool = () => {
 
       setLoading(false)
     },
-    [wallet, payoutWallets, selectedToken, getTxWithHash]
+    [wallet, payoutWallets, selectedToken, txConfirmation]
   )
 
   const clickDownloadReceipt = useCallback(async () => {
@@ -443,8 +446,8 @@ const TheTool = () => {
         columns: [{ width: 100 }, { width: 60 }, { width: 25 }, { width: 60 }],
       })
     } catch (error: any) {
-      addTranscript('ERROR', error.message)
       console.error(error)
+      addTranscript('ERROR', error.message)
     }
 
     setLoading(false)
