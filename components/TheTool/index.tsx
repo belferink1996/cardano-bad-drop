@@ -352,7 +352,9 @@ const TheTool = () => {
             }
           }
 
+          // this may throw an error if TX size is over the limit
           const unsignedTx = await tx.build()
+
           addTranscript(`Building TX ${idx + 1} of ${batches.length}`)
           const signedTx = await wallet.signTx(unsignedTx)
           const txHash = await wallet.submitTx(signedTx)
@@ -381,7 +383,7 @@ const TheTool = () => {
           // [Transaction] An error occurred during build: Maximum transaction size of 16384 exceeded. Found: 21861.
           const splitMessage: string[] = error.message.split(' ')
           const [max, curr] = splitMessage.filter((str) => !isNaN(Number(str))).map((str) => Number(str))
-          // [16384, 21861]n
+          // [16384, 21861]
 
           return await clickAirdrop((difference || 1) * (max / curr))
         } else {
