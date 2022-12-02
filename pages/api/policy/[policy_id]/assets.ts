@@ -9,7 +9,7 @@ type Response = {
 const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
   const {
     method,
-    query: { blockfrostKey, policyId },
+    query: { blockfrostKey, policy_id, all },
   } = req
 
   if (!blockfrostKey || typeof blockfrostKey !== 'string') {
@@ -24,13 +24,15 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
 
     switch (method) {
       case 'GET': {
-        if (!policyId || typeof policyId !== 'string') {
+        if (!policy_id || typeof policy_id !== 'string') {
           return res.status(400).end('Bad Request')
         }
 
-        console.log('Fetching assets with policy ID:', policyId)
+        console.log('Fetching assets with policy ID:', policy_id)
 
-        const data = await blockfrost.assetsPolicyByIdAll(policyId)
+        const data = !!all
+          ? await blockfrost.assetsPolicyByIdAll(policy_id)
+          : await blockfrost.assetsPolicyById(policy_id)
 
         console.log('Fetched assets:', data)
 

@@ -4,7 +4,13 @@ import Modal from '../Modal'
 import Image from 'next/image'
 import { Button } from '@mui/material'
 
-export default function ConnectWallet({ addTranscript }: { addTranscript: (msg: string, key?: string) => void }) {
+export default function ConnectWallet({
+  disabled,
+  addTranscript,
+}: {
+  disabled?: boolean
+  addTranscript: (msg: string, key?: string) => void
+}) {
   const { availableWallets, connectWallet, connecting, connected } = useWallet()
   const [openModal, setOpenModal] = useState<boolean>(false)
 
@@ -13,8 +19,7 @@ export default function ConnectWallet({ addTranscript }: { addTranscript: (msg: 
       <Button
         variant='contained'
         color='secondary'
-        size='large'
-        disabled={connected}
+        disabled={disabled || connecting || connected}
         onClick={() => setOpenModal(true)}
       >
         Connect
@@ -35,7 +40,7 @@ export default function ConnectWallet({ addTranscript }: { addTranscript: (msg: 
                 variant='contained'
                 color='secondary'
                 fullWidth
-                disabled={connected || connecting}
+                disabled={connecting || connected}
                 onClick={() =>
                   connectWallet(wallet.name, (err) => {
                     addTranscript('ERROR', err)
