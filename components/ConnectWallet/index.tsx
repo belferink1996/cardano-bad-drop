@@ -34,24 +34,26 @@ export default function ConnectWallet({
           <p>No wallets installed... 🥲</p>
         ) : (
           <div style={{ marginTop: '1rem', minWidth: '250px', width: '85%' }}>
-            {availableWallets.map((wallet) => (
-              <Button
-                key={`Connect_Wallet_${wallet.name}`}
-                variant='contained'
-                color='secondary'
-                fullWidth
-                disabled={connecting || connected}
-                onClick={() =>
-                  connectWallet(wallet.name, (err) => {
-                    addTranscript('ERROR', err)
-                    setOpenModal(false)
-                  })
-                }
-              >
-                <Image src={wallet.icon} alt={wallet.name} width={35} height={35} />
-                &nbsp;{wallet.name}
-              </Button>
-            ))}
+            {availableWallets.map((wallet) =>
+              wallet.name.toLowerCase() === 'nami' ? (
+                <Button
+                  key={`Connect_Wallet_${wallet.name}`}
+                  variant='contained'
+                  color='secondary'
+                  fullWidth
+                  disabled={connecting || connected}
+                  onClick={() =>
+                    connectWallet(wallet.name, (err) => {
+                      addTranscript('ERROR', err)
+                      setOpenModal(false)
+                    })
+                  }
+                >
+                  <Image src={wallet.icon} alt={wallet.name} width={35} height={35} />
+                  &nbsp;{wallet.name}
+                </Button>
+              ) : null
+            )}
           </div>
         )}
       </Modal>
