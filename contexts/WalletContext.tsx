@@ -17,7 +17,9 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [availableWallets, setAvailableWallets] = useState<Wallet[]>([])
 
   useEffect(() => {
-    setAvailableWallets(BrowserWallet.getInstalledWallets())
+    setAvailableWallets(
+      BrowserWallet.getInstalledWallets().filter((wallet) => wallet.name.toLowerCase() === 'nami')
+    )
   }, [])
 
   const [connecting, setConnecting] = useState<boolean>(false)
