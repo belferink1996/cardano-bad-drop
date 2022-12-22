@@ -1,56 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply text-gray-400;
+  }
+}
+
 :root {
-  --grey: rgb(90, 90, 90);
-  --grey-darker: rgb(50, 50, 50);
-  --grey-darkest: rgb(40, 40, 40);
+  --online: #44b700;
+  --offline: #b74400;
+
+  --cardano-blue: #1231a6;
+  --discord-purple: #7289da;
+
+  --orange: rgb(255, 80, 55);
+  --pink: rgb(255, 0, 130);
+  --gradient: linear-gradient(65deg, var(--orange), var(--pink));
 }
 
-* {
-  padding: 0;
-  margin: 0;
-  box-sizing: border-box;
-}
-
-html,
-body {
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans,
-    Droid Sans, Helvetica Neue, sans-serif;
-}
 html {
-  color-scheme: dark;
+  scroll-behavior: smooth;
 }
+
 body {
-  background: var(--grey-darkest);
-  color: whitesmoke;
-}
-
-.App {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-}
-
-header,
-footer {
-  width: 100%;
-  min-height: 70px;
-  padding: 1rem;
-  background: var(--grey-darker);
-
-  display: flex;
-  align-items: center;
-}
-header {
-  border-bottom: 1px solid black;
-  justify-content: space-between;
-}
-footer {
-  border-top: 1px solid black;
-  justify-content: center;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  font-size: 16px;
+  background-color: rgba(0, 0, 0, 0.1);
+  background-image: url('https://badfoxmc.com/media/landing/bg.png');
+  background-size: cover;
+  background-position: top;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 }

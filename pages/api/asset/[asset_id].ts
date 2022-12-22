@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { BlockFrostAPI } from '@blockfrost/blockfrost-js'
+import blockfrost from '../../../utils/blockfrost'
 
-type Response = {
+export type FetchedAssetResponse = {
   asset: string
   policy_id: string
   asset_name: string | null
@@ -27,31 +27,21 @@ type Response = {
   } | null
 }
 
-const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
-  const {
-    method,
-    query: { blockfrostKey, asset_id },
-  } = req
+const handler = async (req: NextApiRequest, res: NextApiResponse<FetchedAssetResponse>) => {
+  const { method, query } = req
 
-  if (!blockfrostKey || typeof blockfrostKey !== 'string') {
-    return res.status(401).end('Unauthorized')
-  }
+  const assetId = query.asset_id
 
   try {
-    const blockfrost = new BlockFrostAPI({
-      projectId: blockfrostKey,
-      debug: true,
-    })
-
     switch (method) {
       case 'GET': {
-        if (!asset_id || typeof asset_id !== 'string') {
+        if (!assetId || typeof assetId !== 'string') {
           return res.status(400).end('Bad Request')
         }
 
-        console.log('Fetching asset with asset ID:', asset_id)
+        console.log('Fetching asset with asset ID:', assetId)
 
-        const data = await blockfrost.assetsById(asset_id)
+        const data = await blockfrost.assetsById(assetId)
 
         console.log('Fetched asset:', data)
 
@@ -65,11 +55,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
     }
   } catch (error) {
     console.error(error)
-
-    // @ts-ignore
-    if (error?.status_code === 403 || error?.message === 'Invalid project token.') {
-      return res.status(401).end('Unauthorized')
-    }
 
     return res.status(500).end('Internal Server Error')
   }

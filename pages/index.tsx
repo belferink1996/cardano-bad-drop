@@ -1,80 +1,101 @@
-import { Button } from '@mui/material'
 import type { NextPage } from 'next'
-import Head from 'next/head'
 import Image from 'next/image'
-import { useState } from 'react'
-import Modal from '../components/Modal'
-import TheTool from '../components/TheTool'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
+import useScreenSize from '../hooks/useScreenSize'
 
-const Home: NextPage = () => {
-  const [showVid, setShowVid] = useState(false)
-
+const About = () => {
   return (
-    <div className='App'>
-      <Head>
-        <title>Bad Drop | Cardano Airdrop Tool</title>
-        <meta
-          name='description'
-          content='A tool designed to make airdrops on Cardano easy and accesible for everyone!'
-        />
-        <link rel='icon' href='https://badfoxmc.com/media/logo/white_filled.png' />
-      </Head>
+    <div className='my-4 mx-2 md:mx-10 max-w-2xl lg:max-w-lg text-gray-300'>
+      <h2 className='text-xl mb-4'>About The Tool:</h2>
+      <p className='my-4 text-sm'>
+        Bad Drop is responsible for distributing rewards to holders of a given Policy ID. It supports ADA, and
+        Cardano Native Fungible-Tokens (such as Hosky).
+      </p>
+      <p className='my-4 text-sm'>
+        The way it does this, is simply by utilizing Cardano&apos;s Extended UTXO model. This model basicaly allows
+        you to build a transaction that includes multiple recipients.
+      </p>
+      <p className='my-4 text-sm'>
+        Bad Drop will manage everything for you: collection snapshot, payout calculations, transaction batching
+        (within Cardano&apos;s max transaction size limit), and the submitting of batched transaction(s).
+      </p>
 
-      <header>
-        <h1>Bad Drop 🪂</h1>
-
-        <div style={{ display: 'flex' }}>
-          <Button variant='contained' color='primary' style={{ margin: 2 }} onClick={() => setShowVid(true)}>
-            Tutorial
-          </Button>
-          <Button
-            variant='contained'
-            color='primary'
-            style={{ margin: 2 }}
-            onClick={() => window.open('https://github.com/belferink1996/cardano-bad-drop', '_blank')}
-          >
-            Source Code
-          </Button>
-        </div>
-      </header>
-
-      <main>
-        <TheTool />
-      </main>
-
-      <Modal open={showVid} onClose={() => setShowVid(false)} style={{ padding: '3rem' }}>
-        <iframe
-          width='560'
-          height='315'
-          src='https://www.youtube.com/embed/JteReIm9Sv8'
-          title='YouTube video player'
-          frameBorder='0'
-          allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-          allowFullScreen
-        ></iframe>
-      </Modal>
-
-      <footer>
-        <a
-          href='https://badfoxmc.com'
-          target='_blank'
-          rel='noopener noreferrer'
-          style={{ display: 'flex', alignItems: 'center' }}
-        >
-          Developed by{' '}
-          <span style={{ margin: '0 0.4rem' }}>
-            <Image
-              src='https://badfoxmc.com/media/logo/white_alpha.png'
-              alt='Bad Fox MC Logo'
-              width={42}
-              height={42}
-            />
-          </span>{' '}
-          Bad Fox Motorcycle Club™️
-        </a>
-      </footer>
+      <Link
+        href='/tool'
+        className='w-full p-4 block text-center rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700'
+      >
+        Let&apos;s Do This!
+      </Link>
     </div>
   )
 }
 
-export default Home
+const Page: NextPage = () => {
+  const { screenWidth } = useScreenSize()
+
+  const [showFemale, setShowFemale] = useState(false)
+  const [logoSize, setLogoSize] = useState(1)
+  const [foxSize, setFoxSize] = useState(1)
+  const [bikeSize, setBikeSize] = useState(1)
+
+  useEffect(() => {
+    setShowFemale(!!Math.round(Math.random()))
+  }, [])
+
+  useEffect(() => {
+    setLogoSize((screenWidth / 100) * 30.5)
+    setFoxSize((screenWidth / 100) * 42)
+    setBikeSize((screenWidth / 100) * 50)
+  }, [screenWidth])
+
+  return (
+    <div className='px-4 flex flex-col items-center'>
+      <div id='home' className='relative w-screen h-[75vh] md:h-[90vh]'>
+        <div className='hidden lg:block animate__animated animate__fadeInRight'>
+          <About />
+        </div>
+
+        <div className='absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10'>
+          <div className='animate__animated animate__infinite animate__slower animate__pulse'>
+            <Image
+              src='https://badfoxmc.com/media/logo/white_alpha.png'
+              alt='logo'
+              width={logoSize}
+              height={logoSize}
+              className='drop-shadow-landinglogo'
+            />
+          </div>
+        </div>
+
+        <div className='absolute bottom-0 right-0'>
+          <div className='animate__animated animate__fadeInDown'>
+            <Image
+              src={`https://badfoxmc.com/media/landing/${showFemale ? 'f_fox.png' : 'm_fox.png'}`}
+              alt='fox'
+              width={foxSize}
+              height={foxSize}
+            />
+          </div>
+        </div>
+
+        <div className='absolute bottom-0 left-0'>
+          <div className='animate__animated animate__fadeInDown'>
+            <Image
+              src={`https://badfoxmc.com/media/landing/${showFemale ? 'f_bike.png' : 'm_bike.png'}`}
+              alt='motorcycle'
+              width={bikeSize}
+              height={bikeSize / 1.7647}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className='lg:hidden animate__animated animate__fadeInRight'>
+        <About />
+      </div>
+    </div>
+  )
+}
+
+export default Page

@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { BlockFrostAPI } from '@blockfrost/blockfrost-js'
+import blockfrost from '../../utils/blockfrost'
 
-type Response = {
+export type FetchedOwnerResponse = {
   isContract: boolean
   stakeKey: string
   walletAddress: string
@@ -11,22 +11,13 @@ type Response = {
   }[]
 }
 
-const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
+const handler = async (req: NextApiRequest, res: NextApiResponse<FetchedOwnerResponse>) => {
   const {
     method,
-    query: { blockfrostKey, assetId, policyId },
+    query: { assetId, policyId },
   } = req
 
-  if (!blockfrostKey || typeof blockfrostKey !== 'string') {
-    return res.status(401).end('Unauthorized')
-  }
-
   try {
-    const blockfrost = new BlockFrostAPI({
-      projectId: blockfrostKey,
-      debug: true,
-    })
-
     switch (method) {
       case 'GET': {
         if (!assetId || typeof assetId !== 'string' || !policyId || typeof policyId !== 'string') {
@@ -62,11 +53,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
     }
   } catch (error) {
     console.error(error)
-
-    // @ts-ignore
-    if (error?.status_code === 403 || error?.message === 'Invalid project token.') {
-      return res.status(401).end('Unauthorized')
-    }
 
     return res.status(500).end('Internal Server Error')
   }

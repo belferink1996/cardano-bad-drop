@@ -1,25 +1,29 @@
-import '../styles/globals.css'
+import Head from 'next/head'
+import { Fragment } from 'react'
 import type { AppProps } from 'next/app'
-import { WalletProvider } from '../contexts/WalletContext'
-import { createTheme, ThemeProvider } from '@mui/material'
-
-const theme = createTheme({
-  palette: {
-    mode: 'dark',
-    secondary: {
-      main: '#5A5A5A',
-      contrastText: '#F5F5F5',
-    },
-  },
-})
+import '../styles/globals.css'
+import 'animate.css'
+import Header from '../components/layout/Header'
+import Footer from '../components/layout/Footer'
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <WalletProvider>
-      <ThemeProvider theme={theme}>
+    <Fragment>
+      <Head>
+        <title>Bad Drop | Cardano Airdrop Tool</title>
+        <meta
+          name='description'
+          content='A tool designed to make airdrops on Cardano easy and accesible for everyone!'
+        />
+        <link rel='icon' href='https://badfoxmc.com/media/logo/white_filled.png' />
+      </Head>
+
+      <Header />
+      <main className='w-screen min-h-screen bg-black bg-opacity-50'>
         <Component {...pageProps} />
-      </ThemeProvider>
-    </WalletProvider>
+      </main>
+      <Footer />
+    </Fragment>
   )
 }
 

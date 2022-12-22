@@ -1,27 +1,18 @@
 import { NextApiRequest, NextApiResponse } from 'next'
-import { BlockFrostAPI } from '@blockfrost/blockfrost-js'
+import blockfrost from '../../utils/blockfrost'
 
-type Response = {
+export type FetchedTxResponse = {
   txHash: string
   submitted: boolean
 }
 
-const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
+const handler = async (req: NextApiRequest, res: NextApiResponse<FetchedTxResponse>) => {
   const {
     method,
-    query: { blockfrostKey, txHash },
+    query: { txHash },
   } = req
 
-  if (!blockfrostKey || typeof blockfrostKey !== 'string') {
-    return res.status(401).end('Unauthorized')
-  }
-
   try {
-    const blockfrost = new BlockFrostAPI({
-      projectId: blockfrostKey,
-      debug: true,
-    })
-
     switch (method) {
       case 'GET': {
         if (!txHash || typeof txHash !== 'string') {
@@ -47,11 +38,6 @@ const handler = async (req: NextApiRequest, res: NextApiResponse<Response>) => {
     }
   } catch (error) {
     console.error(error)
-
-    // @ts-ignore
-    if (error?.status_code === 403 || error?.message === 'Invalid project token.') {
-      return res.status(401).end('Unauthorized')
-    }
 
     // @ts-ignore
     if (error?.status_code === 404 || error?.message === 'The requested component has not been found.') {

@@ -1,51 +1,21 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import writeXlsxFile from 'write-excel-file'
 import { Asset, Transaction } from '@martifylabs/mesh'
-import {
-  Button,
-  FormControl,
-  FormControlLabel,
-  IconButton,
-  InputLabel,
-  MenuItem,
-  Popover,
-  Radio,
-  RadioGroup,
-  Select,
-  TextField,
-} from '@mui/material'
-import { Help as HelpIcon, Info as InfoIcon } from '@mui/icons-material'
 import { useWallet } from '../../contexts/WalletContext'
-import OnlineIndicator from '../OnlineIndicator'
-import ConnectWallet from '../ConnectWallet'
 import fromHex from '../../functions/hex/fromHex'
-
-const MILLION = 1000000
-
-type Transcript = {
-  timestamp: number
-  msg: string
-  key?: string
-}
-
-type FetchedPolicyAsset = {
-  asset: string
-  quantity: string
-}
+import ConnectWallet from '../ConnectWallet'
+import TranscriptsViewer, { Transcript } from './TranscriptsViewer'
+import Settings, { SettingsObject } from './Settings'
+import Results from './Results'
+import { PolicyAssetsResponse } from '../../pages/api/policy/[policy_id]'
+import { FetchedOwnerResponse } from '../../pages/api/wallet'
+import { FetchedTxResponse } from '../../pages/api/tx-status'
+import { FetchedAssetResponse } from '../../pages/api/asset/[asset_id]'
+import { ONE_MILLION } from '../../constants'
 
 interface Balance extends Asset {
   name?: string
-}
-
-type FetchedOwner = {
-  isContract: boolean
-  stakeKey: string
-  walletAddress: string
-  assets: {
-    unit: string
-    quantity: string
-  }[]
 }
 
 type Holder = {
@@ -61,11 +31,6 @@ type Payout = {
   txHash?: string
 }
 
-type TxStatus = {
-  txHash: string
-  submitted: boolean
-}
-
 type SpreadsheetObject = {
   value: string | number
   type?: StringConstructor | NumberConstructor
@@ -78,37 +43,31 @@ const TheTool = () => {
   const { connected, wallet } = useWallet()
 
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
-  const [listedCount, setListedCount] = useState<number>(0)
-  const [unlistedCount, setUnlistedCount] = useState<number>(0)
-
-  const [blockfrostKey, setBlockfrostKey] = useState<string>('')
+  const [listedCount, setListedCount] = useState(0)
+  const [unlistedCount, setUnlistedCount] = useState(0)
 
   const [tokens, setTokens] = useState<Balance[]>([])
+  const [settings, setSettings] = useState<SettingsObject | null>(null)
+
+  const [loading, setLoading] = useState(false)
+  const [snapshotStarted, setSnapshotStarted] = useState(false)
+  const [snapshotDone, setSnapshotDone] = useState(false)
   const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
-
-  const [policyId, setPolicyId] = useState<string>('')
-  const [selectedToken, setSelectedToken] = useState<string>('')
-  const [tokenQuantity, setTokenQuantity] = useState<number>(0)
-
-  const [tokenAmountType, setTokenAmountType] = useState<'Fixed' | 'Percent' | ''>('')
-  const [tokenFixedAmount, setTokenFixedAmount] = useState<number>(0)
-  const [tokenPercentAmount, setTokenPercentAmount] = useState<number>(0)
-
-  const [loading, setLoading] = useState<boolean>(false)
-  const [snapshotDone, setSnapshotDone] = useState<boolean>(false)
-  const [payoutDone, setPayoutDone] = useState<boolean>(false)
+  const [payoutDone, setPayoutDone] = useState(false)
 
   const isUserSettingsExist = useCallback(
     () =>
       !!(
-        blockfrostKey &&
-        policyId &&
-        selectedToken &&
-        tokenAmountType &&
-        ((tokenAmountType === 'Fixed' && tokenFixedAmount) ||
-          (tokenAmountType === 'Percent' && tokenPercentAmount))
+        settings &&
+        settings.policyId &&
+        settings.tokenId &&
+        settings.tokenBalance &&
+        settings.amountType &&
+        ((settings.amountType === 'Fixed' && settings.fixedAmount) ||
+          (settings.amountType === 'Percent' && settings.percentAmount)) &&
+        settings.splitType
       ),
-    [blockfrostKey, policyId, selectedToken, tokenAmountType, tokenFixedAmount, tokenPercentAmount]
+    [settings]
   )
 
   const addTranscript = (msg: string, key?: string) => {
@@ -128,93 +87,69 @@ const TheTool = () => {
   }
 
   useEffect(() => {
-    addTranscript(
-      'Welcome, please enter a Blockfrsot API Key ☝️',
-      'Afterwards connect with the wallet you want to airdrop with.'
-    )
+    addTranscript('Welcome, please connect your wallet.', 'You have to hold a Bad Key 🔑 to access the tool 🔒')
   }, [])
 
   const fetchPolicyAssets = useCallback(
-    async (_policyId: string, all?: boolean): Promise<FetchedPolicyAsset[] | null> => {
+    async (_policyId: string, _allAssets?: boolean): Promise<PolicyAssetsResponse> => {
       try {
-        const {
-          data,
-        }: {
-          data: FetchedPolicyAsset[]
-        } = await axios.get(
-          `/api/policy/${_policyId}/assets?blockfrostKey=${blockfrostKey}${all ? '&all=true' : ''}`
+        const { data } = await axios.get<PolicyAssetsResponse>(
+          `/api/policy/${_policyId}?allAssets=${!!_allAssets}`
         )
 
         return data
       } catch (error: any) {
         console.error(error)
-        if (error?.response?.status === 401) {
-          addTranscript('ERROR', 'Bad Blockfrost Key!')
-          return null
+
+        const errMsg = error.response.data || error.message
+        addTranscript('ERROR', errMsg)
+
+        if (error.response.status !== 500 && error.response.status !== 400) {
+          return await fetchPolicyAssets(_policyId, _allAssets)
         } else {
-          addTranscript('ERROR', error.message)
-          return await fetchPolicyAssets(_policyId, all)
+          return []
         }
       }
     },
-    [blockfrostKey]
+    []
   )
 
   const fetchOwningWallet = useCallback(
-    async (_assetId: string): Promise<FetchedOwner | null> => {
+    async (_assetId: string, _policyId: string): Promise<FetchedOwnerResponse> => {
       try {
-        const {
-          data,
-        }: {
-          data: FetchedOwner
-        } = await axios.get(`/api/wallet?blockfrostKey=${blockfrostKey}&assetId=${_assetId}&policyId=${policyId}`)
+        const { data } = await axios.get<FetchedOwnerResponse>(
+          `/api/wallet?assetId=${_assetId}&policyId=${_policyId}`
+        )
 
         return data
       } catch (error: any) {
         console.error(error)
-        if (error?.response?.status === 401) {
-          addTranscript('ERROR', 'Bad Blockfrost Key!')
-          return null
-        } else {
-          addTranscript('ERROR', error.message)
-          return await fetchOwningWallet(_assetId)
-        }
+        addTranscript('ERROR', error.message)
+        return await fetchOwningWallet(_assetId, _policyId)
       }
     },
-    [blockfrostKey, policyId]
+    []
   )
 
-  // @ts-ignore
-  const txConfirmation = useCallback(
-    async (_txHash: string): Promise<TxStatus> => {
-      try {
-        const {
-          data,
-        }: {
-          data: TxStatus
-        } = await axios.get(`/api/tx-status?blockfrostKey=${blockfrostKey}&txHash=${_txHash}`)
+  const fetchTxConfirmation = useCallback(async (_txHash: string): Promise<FetchedTxResponse> => {
+    try {
+      const { data } = await axios.get<FetchedTxResponse>(`/api/tx-status?txHash=${_txHash}`)
 
-        if (data.submitted) {
-          return data
-        } else {
-          await sleep(1000)
-          return await txConfirmation(_txHash)
-        }
-      } catch (error: any) {
-        console.error(error)
-        if (error?.response?.status === 401) {
-          throw new Error('Bad Blockfrost Key!')
-        } else {
-          addTranscript('ERROR', error.message)
-          await sleep(1000)
-          return await txConfirmation(_txHash)
-        }
+      if (data.submitted) {
+        return data
+      } else {
+        await sleep(1000)
+        return await fetchTxConfirmation(_txHash)
       }
-    },
-    [blockfrostKey]
-  )
+    } catch (error: any) {
+      console.error(error)
+      addTranscript('ERROR', error.message)
+      await sleep(1000)
+      return await fetchTxConfirmation(_txHash)
+    }
+  }, [])
 
-  const loadWalletBalances = useCallback(async () => {
+  const loadWallet = useCallback(async () => {
     setLoading(true)
 
     if (connected && wallet.getRewardAddresses) {
@@ -224,17 +159,16 @@ const TheTool = () => {
 
         const pIds = await wallet.getPolicyIds()
         const fungiblePolicyIds: typeof pIds = []
-        addTranscript(`Located ${pIds.length} Policy IDs`)
 
-        for await (const pId of pIds) {
-          addTranscript('Analazying Policy ID', pId)
+        for await (const [idx, pId] of pIds.entries()) {
+          addTranscript(`Processing policy ${idx + 1} / ${pIds.length}`, pId)
           const pAssets = await fetchPolicyAssets(pId)
 
           if (pAssets) {
             for (const { quantity } of pAssets) {
               if (Number(quantity) > 5 && !fungiblePolicyIds.find((str) => str === pId)) {
-                addTranscript('Located a new Fungible Token', pId)
                 fungiblePolicyIds.push(pId)
+                addTranscript(`Fungible Token detected, total: ${fungiblePolicyIds.length}`, pId)
               }
             }
           }
@@ -249,9 +183,11 @@ const TheTool = () => {
 
               if (assetId === 'lovelace') {
                 setTokens((prev) => {
-                  if (prev.find(({ unit }) => unit === assetId)) {
+                  if (prev.find((_x) => _x.unit === assetId)) {
                     return prev
                   }
+
+                  balance.name = 'ADA'
 
                   return [...prev, balance]
                 })
@@ -259,9 +195,11 @@ const TheTool = () => {
 
               if (Number(balance.quantity) > 1) {
                 if (assetId.indexOf(pId) === 0) {
-                  const { data } = await axios.get(`/api/asset/${assetId}?blockfrostKey=${blockfrostKey}`)
+                  const { data } = await axios.get<FetchedAssetResponse>(`/api/asset/${assetId}`)
 
-                  balance.name = data.metadata?.name || data.onchain_metadata?.name || fromHex(data.asset_name)
+                  balance.name =
+                    data.metadata?.name || data.onchain_metadata?.name || fromHex(data?.asset_name || '')
+
                   setTokens((prev) => [...prev, balance])
                 }
               }
@@ -269,12 +207,12 @@ const TheTool = () => {
           }
         } else {
           const lovelace = await wallet.getLovelace()
-          setTokens([{ unit: 'lovelace', quantity: lovelace }])
+          setTokens([{ unit: 'lovelace', name: 'ADA', quantity: lovelace }])
         }
 
         addTranscript(
-          'Fill in the remaining settings ☝️',
-          'We currently support ADA (Lovelace) & Fungible Tokens.'
+          'Define your settings below',
+          "Once the snapshot's initiated, the settings can't be altered."
         )
       } catch (error: any) {
         console.error(error)
@@ -286,19 +224,26 @@ const TheTool = () => {
   }, [connected, wallet, fetchPolicyAssets])
 
   useEffect(() => {
-    if (!loading) loadWalletBalances()
-  }, [loadWalletBalances])
+    if (!loading) loadWallet()
+  }, [loadWallet])
 
   const clickSnapshot = useCallback(async () => {
+    if (!settings) return
     setLoading(true)
+    setSnapshotStarted(true)
 
     const holders: Holder[] = []
-    const fetchedWallets: FetchedOwner[] = []
+    const fetchedWallets: FetchedOwnerResponse[] = []
     let unlistedCountForPayoutCalculation = 0
 
-    addTranscript('Processing policy', policyId)
-    const policyAssets = await fetchPolicyAssets(policyId, true)
-    if (!policyAssets) return // for managed error (like bad blockfrost key)
+    addTranscript('Processing policy', settings.policyId)
+    const policyAssets = await fetchPolicyAssets(settings.policyId, true)
+
+    if (!policyAssets || !policyAssets.length) {
+      setLoading(false)
+      setSnapshotStarted(false)
+      return // for managed error (like bad blockfrost key)
+    }
 
     for (let i = 0; i < policyAssets.length; i++) {
       const { asset: assetId, quantity } = policyAssets[i]
@@ -313,8 +258,8 @@ const TheTool = () => {
           ({ assets }) => !!assets.find(({ unit }) => unit === assetId)
         )
 
-        const wallet = foundFetchedWallet || (await fetchOwningWallet(assetId))
-        if (!wallet) return // for managed error (like bad blockfrost key)
+        const wallet = foundFetchedWallet || (await fetchOwningWallet(assetId, settings.policyId))
+        if (!wallet) return // for managed error (like bad blockfrost request)
 
         // this is to improve speed, reduce backend calls
         if (!foundFetchedWallet) {
@@ -349,10 +294,10 @@ const TheTool = () => {
     }
 
     const totalPool =
-      tokenAmountType === 'Fixed'
-        ? tokenFixedAmount
-        : tokenAmountType === 'Percent'
-        ? tokenQuantity * (tokenPercentAmount / 100)
+      settings.amountType === 'Fixed'
+        ? settings.fixedAmount
+        : settings.amountType === 'Percent'
+        ? settings.tokenBalance * (settings.percentAmount / 100)
         : 0
 
     const sharePerAsset = Math.floor(totalPool / unlistedCountForPayoutCalculation)
@@ -362,7 +307,8 @@ const TheTool = () => {
         .map(({ stakeKey, addresses, assets }) => ({
           stakeKey,
           address: addresses[0],
-          payout: assets.length * sharePerAsset,
+          payout: settings.splitType === 'Equal' ? assets.length * sharePerAsset : 0,
+          txHash: '',
         }))
         .sort((a, b) => b.payout - a.payout)
     )
@@ -370,15 +316,7 @@ const TheTool = () => {
     addTranscript('Snapshot done!')
     setSnapshotDone(true)
     setLoading(false)
-  }, [
-    policyId,
-    tokenQuantity,
-    tokenAmountType,
-    tokenFixedAmount,
-    tokenPercentAmount,
-    fetchPolicyAssets,
-    fetchOwningWallet,
-  ])
+  }, [settings, fetchPolicyAssets, fetchOwningWallet])
 
   const clickAirdrop = useCallback(
     async (difference?: number): Promise<any> => {
@@ -388,13 +326,16 @@ const TheTool = () => {
         addTranscript('Batching TXs', 'This may take a moment...')
       }
 
-      if (selectedToken !== 'lovelace') {
+      if (settings?.tokenId !== 'lovelace') {
         const minAdaPerHolder = 1.2
         const adaNeeded = Math.round(payoutWallets.length / minAdaPerHolder)
-        const adaInWallet = Number(tokens.find(({ unit }) => unit === 'lovelace')?.quantity || MILLION) / MILLION
+        const adaInWallet = Number(await wallet.getLovelace()) / ONE_MILLION
 
         if (adaInWallet < adaNeeded) {
-          addTranscript('Insufficient ADA', `Please acquire at least ${adaNeeded} ADA and refresh to try again`)
+          addTranscript(
+            'Insufficient ADA',
+            `Please acquire at least ${adaNeeded} ADA (not including UTXOs) and try again`
+          )
           setLoading(false)
           return
         }
@@ -414,10 +355,10 @@ const TheTool = () => {
           const tx = new Transaction({ initiator: wallet })
 
           for (const { address, payout } of batch) {
-            if (selectedToken === 'lovelace') {
-              if (payout < MILLION) {
+            if (settings?.tokenId === 'lovelace') {
+              if (payout < ONE_MILLION) {
                 const str1 = 'Cardano requires at least 1 ADA per TX.'
-                const str2 = `This wallet has only ${(payout / MILLION).toFixed(
+                const str2 = `This wallet has only ${(payout / ONE_MILLION).toFixed(
                   2
                 )} ADA assigned to it:\n${address}`
                 const str3 = 'Click OK if you want to increase the payout for this wallet to 1 ADA.'
@@ -425,7 +366,7 @@ const TheTool = () => {
                 const str5 = 'Note: accepting will increase the total pool size.'
 
                 if (window.confirm(`${str1}\n\n${str2}\n\n${str3}\n${str4}\n\n${str5}`)) {
-                  tx.sendLovelace(address, String(MILLION))
+                  tx.sendLovelace(address, String(ONE_MILLION))
                 }
               } else {
                 tx.sendLovelace(address, String(payout))
@@ -433,7 +374,7 @@ const TheTool = () => {
             } else {
               tx.sendAssets(address, [
                 {
-                  unit: selectedToken,
+                  unit: settings?.tokenId,
                   quantity: String(payout),
                 },
               ])
@@ -447,7 +388,7 @@ const TheTool = () => {
           const signedTx = await wallet.signTx(unsignedTx)
           const txHash = await wallet.submitTx(signedTx)
           addTranscript('Awaiting network confirmation', 'This may take a moment...')
-          await txConfirmation(txHash)
+          await fetchTxConfirmation(txHash)
           addTranscript('Confirmed!', txHash)
 
           setPayoutWallets((prev) =>
@@ -483,7 +424,7 @@ const TheTool = () => {
 
       setLoading(false)
     },
-    [wallet, payoutWallets, selectedToken, txConfirmation]
+    [wallet, settings, payoutWallets, fetchTxConfirmation]
   )
 
   const clickDownloadReceipt = useCallback(async () => {
@@ -522,7 +463,7 @@ const TheTool = () => {
         },
         {
           type: String,
-          value: (selectedToken === 'lovelace' ? payout / MILLION : payout).toFixed(2),
+          value: (settings?.tokenId === 'lovelace' ? payout / ONE_MILLION : payout).toFixed(2),
         },
         {
           type: String,
@@ -543,325 +484,56 @@ const TheTool = () => {
     }
 
     setLoading(false)
-  }, [payoutWallets, selectedToken])
-
-  const [blockfrostKeyPopoverEl, setBlockfrostKeyPopoverEl] = useState<Element | null>(null)
-  const [policyIdPopoverEl, setPolicyIdPopoverEl] = useState<Element | null>(null)
-
-  const styles = useMemo(
-    () => ({
-      userSettings: {
-        opacity: connected ? 1 : 0.4,
-      },
-      keyInpSection: {
-        margin: '1rem 0',
-        display: 'flex',
-        flexDirection: 'column' as const,
-      },
-      keyInpWrap: {
-        margin: '0.2rem 0',
-        display: 'flex',
-        alignItems: 'center',
-      },
-      tokenInpSection: {
-        margin: '1rem 0',
-        display: 'flex',
-        flexDirection: 'column' as const,
-        alignItems: 'center',
-      },
-      tokenAmountWrap: {
-        margin: '0.2rem 0',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      },
-      inp: {
-        borderRadius: '0.5rem',
-      },
-      transcripts: {
-        width: '69vw',
-        height: '42vh',
-        margin: '1rem auto',
-        padding: '0.5rem 1rem',
-        backgroundColor: 'var(--grey-darker)',
-        borderRadius: '1rem',
-        border: '1px solid var(--grey)',
-        display: 'flex',
-        flexDirection: 'column-reverse' as const,
-        overflowY: 'scroll' as const,
-      },
-    }),
-    [connected]
-  )
+  }, [settings, payoutWallets])
 
   return (
-    <div>
-      <div style={styles.userSettings}>
-        <div style={styles.keyInpSection}>
-          <div style={styles.keyInpWrap}>
-            <IconButton onClick={(e) => setBlockfrostKeyPopoverEl(e.currentTarget)}>
-              <HelpIcon />
-            </IconButton>
-            <Popover
-              anchorEl={blockfrostKeyPopoverEl}
-              open={!!blockfrostKeyPopoverEl}
-              onClose={() => setBlockfrostKeyPopoverEl(null)}
-              anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-              transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-            >
-              <div style={{ padding: '1rem', backgroundColor: 'var(--grey)' }}>
-                <h4>How to get a Blockfrost API Key?</h4>
-                <ol style={{ margin: '0.5rem 0 0 1rem', fontSize: '0.8rem' }}>
-                  <li>
-                    Go to{' '}
-                    <a
-                      href='https://blockfrost.io'
-                      target='_blank'
-                      rel='noopener noreferrer'
-                      style={{ color: 'skyblue', cursor: 'pointer' }}
-                    >
-                      blockfrost.io
-                    </a>
-                  </li>
-                  <li>Sign-in, or create a new account</li>
-                  <li>Select a project, or add a new one (mainnet)</li>
-                  <li>Copy your &quot;API Key&quot; / &quot;Project ID&quot;</li>
-                </ol>
-              </div>
-            </Popover>
-            <TextField
-              label='Blockfrost API Key'
-              type='password'
-              variant='filled'
-              size='small'
-              fullWidth
-              style={styles.inp}
-              disabled={connected || loading}
-              value={blockfrostKey}
-              onChange={(e) => setBlockfrostKey(e.target.value)}
-            />
-          </div>
+    <div className='w-3/4 mx-auto flex flex-col items-center'>
+      <TranscriptsViewer transcripts={transcripts} />
 
-          {connected && tokens.length ? (
-            <div style={styles.keyInpWrap}>
-              <IconButton onClick={(e) => setPolicyIdPopoverEl(e.currentTarget)}>
-                <InfoIcon />
-              </IconButton>
-              <Popover
-                anchorEl={policyIdPopoverEl}
-                open={!!policyIdPopoverEl}
-                onClose={() => setPolicyIdPopoverEl(null)}
-                anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-              >
-                <div style={{ padding: '1rem', backgroundColor: 'var(--grey)' }}>
-                  <h4>For your information!</h4>
-                  <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.8rem' }}>
-                    The snapshot includes 100% of holders, unlisted assets only.
-                    <br />
-                    <br />
-                    Formula: total amount / unlisted NFTs = pay per NFT
-                    <br />
-                    Example: 50,000 ADA / 2,500 NFTs = 20 ADA per NFT
-                  </p>
-                </div>
-              </Popover>
-              <TextField
-                label='Policy ID'
-                variant='filled'
-                size='small'
-                fullWidth
-                style={styles.inp}
-                disabled={!connected || snapshotDone || loading}
-                value={policyId}
-                onChange={(e) => setPolicyId(e.target.value)}
-              />
-            </div>
-          ) : null}
-        </div>
+      <div className='w-full my-4 flex flex-wrap items-center justify-evenly'>
+        <ConnectWallet addTranscript={addTranscript} />
 
-        {connected && tokens.length ? (
-          <div style={styles.tokenInpSection}>
-            <FormControl
-              variant='filled'
-              size='small'
-              fullWidth
-              style={styles.inp}
-              disabled={!connected || snapshotDone || loading}
-            >
-              <InputLabel id='token-select-label'>
-                {selectedToken ? 'Selected Token' : 'Select a Token'}
-              </InputLabel>
-              <Select
-                labelId='token-select-label'
-                label={selectedToken ? 'Selected Token' : 'Select a Token'}
-                value={selectedToken}
-                onChange={(e) => {
-                  const v = e.target.value
+        <button
+          type='button'
+          disabled={!connected || !isUserSettingsExist() || snapshotDone || loading}
+          onClick={clickSnapshot}
+          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+        >
+          Snapshot Holders
+        </button>
 
-                  setSelectedToken(v)
-                  setTokenQuantity(Number(tokens.find(({ unit }) => unit === v)?.quantity || '0'))
-                }}
-              >
-                {tokens.map(({ name, unit, quantity }) => (
-                  <MenuItem key={`unit-${unit}`} value={unit}>
-                    {name || unit} ({quantity})
-                    {unit === 'lovelace' ? ` (${(Number(quantity) / MILLION).toFixed(2)} ADA)` : null}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        <button
+          type='button'
+          disabled={!connected || !snapshotDone || payoutDone || loading}
+          onClick={() => clickAirdrop()}
+          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+        >
+          Airdrop Tokens
+        </button>
 
-            {selectedToken ? (
-              <div style={styles.tokenAmountWrap}>
-                <FormControl disabled={!connected || snapshotDone || !selectedToken || loading}>
-                  <RadioGroup
-                    row
-                    name='token-amount-type'
-                    value={tokenAmountType}
-                    // @ts-ignore
-                    onChange={(e) => setTokenAmountType(e.target.value)}
-                  >
-                    <FormControlLabel label='Fixed Amount' value='Fixed' control={<Radio />} />
-                    <FormControlLabel label='Percent Amount' value='Percent' control={<Radio />} />
-                  </RadioGroup>
-                </FormControl>
-
-                <div style={{ width: '100%' }}>
-                  <TextField
-                    label='Value'
-                    variant='filled'
-                    size='small'
-                    fullWidth
-                    style={styles.inp}
-                    disabled={!connected || snapshotDone || !tokenAmountType || loading}
-                    focused={!!tokenAmountType}
-                    placeholder={
-                      tokenAmountType === 'Fixed' ? '800,000' : tokenAmountType === 'Percent' ? '80%' : ''
-                    }
-                    value={
-                      tokenAmountType === 'Fixed'
-                        ? tokenFixedAmount || ''
-                        : tokenAmountType === 'Percent'
-                        ? tokenPercentAmount || ''
-                        : ''
-                    }
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      if (!isNaN(v)) {
-                        tokenAmountType === 'Fixed' && v >= 0 && v <= tokenQuantity
-                          ? setTokenFixedAmount(v)
-                          : tokenAmountType === 'Percent' && v >= 0 && v <= 100
-                          ? setTokenPercentAmount(v)
-                          : null
-                      }
-                    }}
-                  />
-
-                  {selectedToken === 'lovelace' ? (
-                    <p style={{ marginTop: '0.1rem', fontSize: '0.9rem' }}>
-                      Translates to:{' '}
-                      {(tokenAmountType === 'Fixed'
-                        ? tokenFixedAmount / MILLION
-                        : tokenAmountType === 'Percent'
-                        ? (tokenQuantity * (tokenPercentAmount / 100)) / MILLION
-                        : 0
-                      ).toFixed(2)}{' '}
-                      ADA total
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        <button
+          type='button'
+          disabled={!payoutDone || loading}
+          onClick={clickDownloadReceipt}
+          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+        >
+          Download Receipt
+        </button>
       </div>
 
-      <div style={styles.transcripts}>
-        {transcripts.map((item, idx) => {
-          if (item) {
-            const { timestamp, msg, key } = item
+      <Settings
+        tokens={tokens}
+        disabled={!connected || snapshotDone || loading}
+        callbackSettings={(payload) => setSettings(payload)}
+      />
 
-            return (
-              <p key={`txt_${idx}_${timestamp}`} style={{ margin: 0 }}>
-                {new Date(timestamp).toLocaleTimeString()} - {msg}
-                {key ? (
-                  <Fragment>
-                    <br />
-                    <span style={{ fontSize: '0.8rem' }}>{key}</span>
-                  </Fragment>
-                ) : null}
-              </p>
-            )
-          } else {
-            return null
-          }
-        })}
-      </div>
-
-      <div style={{ display: 'flex', flexFlow: 'row wrap', alignItems: 'center', justifyContent: 'space-evenly' }}>
-        <OnlineIndicator online={!connected && !!blockfrostKey}>
-          <ConnectWallet addTranscript={addTranscript} disabled={!blockfrostKey} />
-        </OnlineIndicator>
-
-        <OnlineIndicator online={connected && !snapshotDone && !payoutDone && !loading && isUserSettingsExist()}>
-          <Button
-            variant='contained'
-            color='secondary'
-            disabled={!connected || snapshotDone || payoutDone || loading || !isUserSettingsExist()}
-            onClick={clickSnapshot}
-          >
-            Snapshot
-          </Button>
-        </OnlineIndicator>
-
-        <OnlineIndicator online={connected && snapshotDone && !payoutDone && !loading}>
-          <Button
-            variant='contained'
-            color='secondary'
-            disabled={!connected || !snapshotDone || payoutDone || loading}
-            onClick={() => clickAirdrop()}
-          >
-            Airdrop
-          </Button>
-        </OnlineIndicator>
-
-        <OnlineIndicator online={connected && snapshotDone && payoutDone && !loading}>
-          <Button
-            variant='contained'
-            color='secondary'
-            disabled={!connected || !snapshotDone || !payoutDone || loading}
-            onClick={clickDownloadReceipt}
-          >
-            Download Receipt
-          </Button>
-        </OnlineIndicator>
-      </div>
-
-      <div style={{ margin: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <p style={{ margin: 11 }}>Listed: {listedCount}</p>
-        <p style={{ margin: 11 }}>Unlisted: {unlistedCount}</p>
-      </div>
-
-      {payoutWallets.length ? (
-        <table style={{ margin: '0 auto' }}>
-          <thead>
-            <tr>
-              <th>Payout</th>
-              <th>Stake Key</th>
-              <th>TX Hash</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payoutWallets.map(({ stakeKey, payout, txHash }, idx) => (
-              <tr key={`${idx}-${stakeKey}`}>
-                <td>{selectedToken === 'lovelace' ? `${(payout / MILLION).toFixed(2)} ADA` : payout}</td>
-                <td style={{ padding: '0 1rem' }}>{stakeKey}</td>
-                <td>{txHash || ''}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {snapshotStarted ? (
+        <Results
+          isLovelace={settings?.tokenId === 'lovelace'}
+          unlisted={unlistedCount}
+          listed={listedCount}
+          payoutWallets={payoutWallets}
+        />
       ) : null}
     </div>
   )

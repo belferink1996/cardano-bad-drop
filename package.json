@@ -2,6 +2,16 @@
   "name": "cardano-bad-drop",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://drop.badfoxmc.com",
+  "author": "Ben Elferink <ben.elferink@icloud.com> (https://www.linkedin.com/in/ben-elferink-37ba251b9)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/belferink1996/bad-fox-motorcycle-club.git"
+  },
+  "bugs": {
+    "url": "https://github.com/belferink1996/bad-fox-motorcycle-club/issues",
+    "email": "ben.elferink@icloud.com"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,23 +19,24 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@blockfrost/blockfrost-js": "^5.1.0",
-    "@emotion/react": "^11.10.5",
-    "@emotion/styled": "^11.10.5",
+    "@blockfrost/blockfrost-js": "^5.2.0",
+    "@heroicons/react": "^2.0.13",
     "@martifylabs/mesh": "^1.2.0",
-    "@mui/icons-material": "^5.10.15",
-    "@mui/material": "^5.10.15",
-    "next": "13.0.4",
+    "animate.css": "^4.1.1",
+    "next": "13.1.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
-    "write-excel-file": "^1.4.15"
+    "write-excel-file": "^1.4.17"
   },
   "devDependencies": {
-    "@types/node": "18.11.9",
-    "@types/react": "18.0.25",
+    "@types/node": "18.11.17",
+    "@types/react": "18.0.26",
     "@types/react-dom": "18.0.9",
-    "eslint": "8.28.0",
-    "eslint-config-next": "13.0.4",
-    "typescript": "4.9.3"
+    "autoprefixer": "^10.4.13",
+    "eslint": "8.30.0",
+    "eslint-config-next": "13.1.0",
+    "postcss": "^8.4.20",
+    "tailwindcss": "^3.2.4",
+    "typescript": "4.9.4"
   }
 }
