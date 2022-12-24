@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useMemo, useEffect, ReactNode } from 'react'
-import { BrowserWallet, Wallet } from '@martifylabs/mesh'
+import { BrowserWallet, Wallet } from '@meshsdk/core'
 
 type ConnectFunc = (walletName: string, callback: (mainStr: string, subStr?: string) => void) => Promise<void>
 

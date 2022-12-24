@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import axios from 'axios'
 import writeXlsxFile from 'write-excel-file'
-import { Asset, Transaction } from '@martifylabs/mesh'
+import { Asset, Transaction } from '@meshsdk/core'
 import { useWallet } from '../../contexts/WalletContext'
 import fromHex from '../../functions/hex/fromHex'
 import ConnectWallet from '../ConnectWallet'

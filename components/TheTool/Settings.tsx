@@ -1,5 +1,5 @@
 import { ChevronDownIcon } from '@heroicons/react/24/solid'
-import { Asset } from '@martifylabs/mesh'
+import { Asset } from '@meshsdk/core'
 import { useEffect, useState } from 'react'
 import { ONE_MILLION } from '../../constants'
 import formatBigNumber from '../../functions/formatBigNumber'
