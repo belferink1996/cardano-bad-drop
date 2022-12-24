@@ -57,16 +57,6 @@ const Navigation = () => {
               Help
             </button>
           </li>
-          <li onClick={() => setOpenNav(false)}>
-            <Link
-              href='https://github.com/belferink1996/cardano-bad-drop'
-              target='_blank'
-              rel='noopener'
-              className='block py-2 px-3 md:p-0 w-full md:w-auto text-start md:text-center text-sm rounded md:border-0 hover:bg-gray-700 md:hover:bg-transparent hover:text-white'
-            >
-              Code
-            </Link>
-          </li>
         </ul>
       </div>
 
