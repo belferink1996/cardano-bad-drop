@@ -55,7 +55,7 @@ const ConnectWallet = ({ addTranscript }: { addTranscript: (msg: string, key?: s
                       : '0',
                 }}
               >
-                <Image src={wallet.icon} alt={wallet.name} width={35} height={35} className='mr-2' />
+                <Image src={wallet.icon} alt={wallet.name} unoptimized width={35} height={35} className='mr-2' />
                 {wallet.name}
               </button>
             ))}

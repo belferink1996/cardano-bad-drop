@@ -29,9 +29,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
   const [availableWallets, setAvailableWallets] = useState<Wallet[]>(ctxInit.availableWallets)
 
   useEffect(() => {
-    setAvailableWallets(
-      BrowserWallet.getInstalledWallets().filter((wallet) => wallet.name.toLowerCase() === 'nami')
-    )
+    setAvailableWallets(BrowserWallet.getInstalledWallets())
   }, [])
 
   const [connecting, setConnecting] = useState(ctxInit.connecting)

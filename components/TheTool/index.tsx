@@ -43,32 +43,6 @@ const TheTool = () => {
   const { connected, wallet } = useWallet()
 
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
-  const [listedCount, setListedCount] = useState(0)
-  const [unlistedCount, setUnlistedCount] = useState(0)
-
-  const [tokens, setTokens] = useState<Balance[]>([])
-  const [settings, setSettings] = useState<SettingsObject | null>(null)
-
-  const [loading, setLoading] = useState(false)
-  const [snapshotStarted, setSnapshotStarted] = useState(false)
-  const [snapshotDone, setSnapshotDone] = useState(false)
-  const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
-  const [payoutDone, setPayoutDone] = useState(false)
-
-  const isUserSettingsExist = useCallback(
-    () =>
-      !!(
-        settings &&
-        settings.policyId &&
-        settings.tokenId &&
-        settings.tokenBalance &&
-        settings.amountType &&
-        ((settings.amountType === 'Fixed' && settings.fixedAmount) ||
-          (settings.amountType === 'Percent' && settings.percentAmount)) &&
-        settings.splitType
-      ),
-    [settings]
-  )
 
   const addTranscript = (msg: string, key?: string) => {
     setTranscripts((prev) => {
@@ -89,6 +63,82 @@ const TheTool = () => {
   useEffect(() => {
     addTranscript('Welcome, please connect your wallet.', 'You have to hold a Bad Key 🔑 to access the tool 🔒')
   }, [])
+
+  const [connectedStakeKey, setConnectedStakeKey] = useState('')
+  const [tokens, setTokens] = useState<Balance[]>([])
+  const [settings, setSettings] = useState<SettingsObject | null>(null)
+  const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
+
+  const [listedCount, setListedCount] = useState(0)
+  const [unlistedCount, setUnlistedCount] = useState(0)
+
+  const [loading, setLoading] = useState(false)
+  const [txError, setTxError] = useState('')
+  const [sessionId, setSessionId] = useState('')
+
+  const [snapshotStarted, setSnapshotStarted] = useState(false)
+  const [snapshotDone, setSnapshotDone] = useState(false)
+  const [payoutStarted, setPayoutStarted] = useState(false)
+  const [payoutDone, setPayoutDone] = useState(false)
+  const [receiptStarted, setReceiptStarted] = useState(false)
+  const [receiptDone, setReceiptDone] = useState(false)
+
+  const isUserSettingsExist = useCallback(
+    () =>
+      !!(
+        settings &&
+        settings.policyId &&
+        settings.tokenId &&
+        settings.tokenBalance &&
+        settings.amountType &&
+        ((settings.amountType === 'Fixed' && settings.fixedAmount) ||
+          (settings.amountType === 'Percent' && settings.percentAmount)) &&
+        settings.splitType
+      ),
+    [settings]
+  )
+
+  const recordSession = useCallback(async () => {
+    if (snapshotStarted) {
+      const payload = {
+        stakeKey: connectedStakeKey,
+        snapshotStarted,
+        snapshotDone,
+        payoutStarted,
+        payoutDone,
+        receiptStarted,
+        receiptDone,
+        txError,
+        settings,
+      }
+
+      try {
+        if (!sessionId) {
+          const { data } = await axios.post('/main-api/sessions/bad-drop', payload)
+          setSessionId(data.sessionId)
+        } else {
+          await axios.patch(`/main-api/sessions/bad-drop?sessionId=${sessionId}`, payload)
+        }
+      } catch (error) {
+        console.error(error)
+      }
+    }
+  }, [
+    connectedStakeKey,
+    sessionId,
+    snapshotStarted,
+    snapshotDone,
+    payoutStarted,
+    payoutDone,
+    receiptStarted,
+    receiptDone,
+    txError,
+    settings,
+  ])
+
+  useEffect(() => {
+    recordSession()
+  }, [recordSession])
 
   const fetchPolicyAssets = useCallback(
     async (_policyId: string, _allAssets?: boolean): Promise<PolicyAssetsResponse> => {
@@ -156,6 +206,7 @@ const TheTool = () => {
       try {
         const sKeys = await wallet.getRewardAddresses()
         addTranscript('Connected', sKeys[0])
+        setConnectedStakeKey(sKeys[0])
 
         const pIds = await wallet.getPolicyIds()
         const fungiblePolicyIds: typeof pIds = []
@@ -242,7 +293,7 @@ const TheTool = () => {
     if (!policyAssets || !policyAssets.length) {
       setLoading(false)
       setSnapshotStarted(false)
-      return // for managed error (like bad blockfrost key)
+      return // for managed error (like blockfrost bad policy id)
     }
 
     for (let i = 0; i < policyAssets.length; i++) {
@@ -321,6 +372,7 @@ const TheTool = () => {
   const clickAirdrop = useCallback(
     async (difference?: number): Promise<any> => {
       setLoading(true)
+      setPayoutStarted(true)
 
       if (!difference) {
         addTranscript('Batching TXs', 'This may take a moment...')
@@ -366,13 +418,13 @@ const TheTool = () => {
                 const str5 = 'Note: accepting will increase the total pool size.'
 
                 if (window.confirm(`${str1}\n\n${str2}\n\n${str3}\n${str4}\n\n${str5}`)) {
-                  tx.sendLovelace(address, String(ONE_MILLION))
+                  tx.sendLovelace({ address }, String(ONE_MILLION))
                 }
               } else {
-                tx.sendLovelace(address, String(payout))
+                tx.sendLovelace({ address }, String(payout))
               }
             } else {
-              tx.sendAssets(address, [
+              tx.sendAssets({ address }, [
                 {
                   unit: settings?.tokenId,
                   quantity: String(payout),
@@ -419,6 +471,7 @@ const TheTool = () => {
           return await clickAirdrop((difference || 1) * (max / curr))
         } else {
           addTranscript('ERROR', error.message)
+          setTxError(error.message)
         }
       }
 
@@ -429,19 +482,16 @@ const TheTool = () => {
 
   const clickDownloadReceipt = useCallback(async () => {
     setLoading(true)
+    setReceiptStarted(true)
 
     const data: SpreadsheetObject[][] = [
       [
         {
-          value: 'Wallet Address',
+          value: 'Payout',
           fontWeight: 'bold',
         },
         {
           value: 'Stake Key',
-          fontWeight: 'bold',
-        },
-        {
-          value: 'Payout',
           fontWeight: 'bold',
         },
         {
@@ -451,19 +501,15 @@ const TheTool = () => {
       ],
     ]
 
-    for (const { address, stakeKey, payout, txHash } of payoutWallets) {
+    for (const { stakeKey, payout, txHash } of payoutWallets) {
       data.push([
         {
           type: String,
-          value: address,
+          value: (settings?.tokenId === 'lovelace' ? payout / ONE_MILLION : payout).toFixed(2),
         },
         {
           type: String,
           value: stakeKey,
-        },
-        {
-          type: String,
-          value: (settings?.tokenId === 'lovelace' ? payout / ONE_MILLION : payout).toFixed(2),
         },
         {
           type: String,
@@ -478,6 +524,7 @@ const TheTool = () => {
         // @ts-ignore
         columns: [{ width: 100 }, { width: 60 }, { width: 25 }, { width: 60 }],
       })
+      setReceiptDone(true)
     } catch (error: any) {
       console.error(error)
       addTranscript('ERROR', error.message)
