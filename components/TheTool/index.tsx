@@ -99,7 +99,7 @@ const TheTool = () => {
   )
 
   const recordSession = useCallback(async () => {
-    if (snapshotStarted) {
+    if (connectedStakeKey) {
       const payload = {
         stakeKey: connectedStakeKey,
         snapshotStarted,
@@ -152,6 +152,7 @@ const TheTool = () => {
         console.error(error)
 
         const errMsg = error.response.data || error.message
+        setTxError(errMsg)
         addTranscript('ERROR', errMsg)
 
         if (error.response.status !== 500 && error.response.status !== 400) {
@@ -174,6 +175,7 @@ const TheTool = () => {
         return data
       } catch (error: any) {
         console.error(error)
+        setTxError(error.message)
         addTranscript('ERROR', error.message)
         return await fetchOwningWallet(_assetId, _policyId)
       }
@@ -193,6 +195,7 @@ const TheTool = () => {
       }
     } catch (error: any) {
       console.error(error)
+      setTxError(error.message)
       addTranscript('ERROR', error.message)
       await sleep(1000)
       return await fetchTxConfirmation(_txHash)
@@ -267,6 +270,7 @@ const TheTool = () => {
         )
       } catch (error: any) {
         console.error(error)
+        setTxError(error.message)
         addTranscript('ERROR', error.message)
       }
     }
@@ -527,6 +531,7 @@ const TheTool = () => {
       setReceiptDone(true)
     } catch (error: any) {
       console.error(error)
+      setTxError(error.message)
       addTranscript('ERROR', error.message)
     }
 
