@@ -12,7 +12,7 @@ import { PolicyAssetsResponse } from '../../pages/api/policy/[policy_id]'
 import { FetchedOwnerResponse } from '../../pages/api/wallet'
 import { FetchedTxResponse } from '../../pages/api/tx-status'
 import { FetchedAssetResponse } from '../../pages/api/asset/[asset_id]'
-import { ONE_MILLION } from '../../constants'
+import { ONE_MILLION, TOOLS_PROD_CODE } from '../../constants'
 
 interface Balance extends Asset {
   name?: string
@@ -101,6 +101,8 @@ const TheTool = () => {
   const recordSession = useCallback(async () => {
     if (connectedStakeKey && (snapshotStarted || errorMessage)) {
       const payload = {
+        errorMessage,
+        settings,
         stakeKey: connectedStakeKey,
         snapshotStarted,
         snapshotDone,
@@ -108,32 +110,34 @@ const TheTool = () => {
         payoutDone,
         receiptStarted,
         receiptDone,
-        errorMessage,
-        settings,
       }
 
       try {
         if (!sessionId) {
-          const { data } = await axios.post('/main-api/sessions/bad-drop', payload)
+          const { data } = await axios.post('/main-api/tool-sessions/bad-drop', payload, {
+            headers: { tools_prod_code: TOOLS_PROD_CODE },
+          })
           setSessionId(data.sessionId)
         } else {
-          await axios.patch(`/main-api/sessions/bad-drop?sessionId=${sessionId}`, payload)
+          await axios.patch(`/main-api/tool-sessions/bad-drop?sessionId=${sessionId}`, payload, {
+            headers: { tools_prod_code: TOOLS_PROD_CODE },
+          })
         }
       } catch (error) {
         console.error(error)
       }
     }
   }, [
-    connectedStakeKey,
     sessionId,
+    errorMessage,
+    settings,
+    connectedStakeKey,
     snapshotStarted,
     snapshotDone,
     payoutStarted,
     payoutDone,
     receiptStarted,
     receiptDone,
-    errorMessage,
-    settings,
   ])
 
   useEffect(() => {
