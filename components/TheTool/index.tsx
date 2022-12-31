@@ -40,7 +40,7 @@ type SpreadsheetObject = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(() => resolve(true), ms))
 
 const TheTool = () => {
-  const { connected, connectedName, wallet } = useWallet()
+  const { connected, connectedName, hasNoKey, wallet } = useWallet()
 
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
 
@@ -99,7 +99,7 @@ const TheTool = () => {
   )
 
   const recordSession = useCallback(async () => {
-    if (connectedStakeKey) {
+    if (connectedStakeKey && (hasNoKey || snapshotStarted)) {
       const payload = {
         stakeKey: connectedStakeKey,
         snapshotStarted,
@@ -125,6 +125,7 @@ const TheTool = () => {
     }
   }, [
     connectedStakeKey,
+    hasNoKey,
     sessionId,
     snapshotStarted,
     snapshotDone,
