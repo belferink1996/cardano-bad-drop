@@ -8,6 +8,7 @@ const ctxInit: {
   connectWallet: ConnectFunc
   connecting: boolean
   connected: boolean
+  connectedName: string
   hasNoKey: boolean
   wallet: BrowserWallet
 } = {
@@ -15,6 +16,7 @@ const ctxInit: {
   connectWallet: async (walletName, callback) => {},
   connecting: false,
   connected: false,
+  connectedName: '',
   hasNoKey: false,
   wallet: {} as BrowserWallet,
 }
@@ -34,6 +36,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
 
   const [connecting, setConnecting] = useState(ctxInit.connecting)
   const [connected, setConnected] = useState(ctxInit.connected)
+  const [connectedName, setConnectedName] = useState(ctxInit.connectedName)
   const [hasNoKey, setHasNoKey] = useState(ctxInit.hasNoKey)
   const [wallet, setWallet] = useState<BrowserWallet>(ctxInit.wallet)
 
@@ -56,6 +59,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
           if (pIds.includes('80e3ccc66f4dfeff6bc7d906eb166a984a1fc6d314e33721ad6add14')) {
             setWallet(_wallet)
             setConnected(true)
+            setConnectedName(_walletName)
           } else {
             _cb("Wallet doesn't have a Bad Key 🔐", 'https://jpg.store/collection/badkey')
             setHasNoKey(true)
@@ -79,6 +83,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
       connectWallet,
       connecting,
       connected,
+      connectedName,
       hasNoKey,
       wallet,
     }),

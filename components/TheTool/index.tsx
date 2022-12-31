@@ -40,7 +40,7 @@ type SpreadsheetObject = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(() => resolve(true), ms))
 
 const TheTool = () => {
-  const { connected, wallet } = useWallet()
+  const { connected, connectedName, wallet } = useWallet()
 
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
 
@@ -542,35 +542,43 @@ const TheTool = () => {
     <div className='w-3/4 mx-auto flex flex-col items-center'>
       <TranscriptsViewer transcripts={transcripts} />
 
-      <div className='w-full my-4 flex flex-wrap items-center justify-evenly'>
-        <ConnectWallet addTranscript={addTranscript} />
+      <div className='w-full my-4'>
+        <div className='flex flex-wrap items-center justify-evenly'>
+          <ConnectWallet addTranscript={addTranscript} />
 
-        <button
-          type='button'
-          disabled={!connected || !isUserSettingsExist() || snapshotDone || loading}
-          onClick={clickSnapshot}
-          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-        >
-          Snapshot Holders
-        </button>
+          <button
+            type='button'
+            disabled={!connected || !isUserSettingsExist() || snapshotDone || loading}
+            onClick={clickSnapshot}
+            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+          >
+            Snapshot Holders
+          </button>
 
-        <button
-          type='button'
-          disabled={!connected || !snapshotDone || payoutDone || loading}
-          onClick={() => clickAirdrop()}
-          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-        >
-          Airdrop Tokens
-        </button>
+          <button
+            type='button'
+            disabled={!connected || !snapshotDone || payoutDone || loading}
+            onClick={() => clickAirdrop()}
+            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+          >
+            Airdrop Tokens
+          </button>
 
-        <button
-          type='button'
-          disabled={!payoutDone || loading}
-          onClick={clickDownloadReceipt}
-          className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-        >
-          Download Receipt
-        </button>
+          <button
+            type='button'
+            disabled={!payoutDone || loading}
+            onClick={clickDownloadReceipt}
+            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+          >
+            Download Receipt
+          </button>
+        </div>
+
+        {connectedName.toLowerCase() === 'eternl' ? (
+          <p className='text-center text-lg text-[var(--pink)]'>
+            Eternl is known to cause problems, please consider using a single-address wallet.
+          </p>
+        ) : null}
       </div>
 
       <Settings
