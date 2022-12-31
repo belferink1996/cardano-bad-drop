@@ -40,7 +40,7 @@ type SpreadsheetObject = {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(() => resolve(true), ms))
 
 const TheTool = () => {
-  const { connected, connectedName, hasNoKey, wallet } = useWallet()
+  const { connected, connectedName, wallet } = useWallet()
 
   const [transcripts, setTranscripts] = useState<Transcript[]>([])
 
@@ -73,7 +73,7 @@ const TheTool = () => {
   const [unlistedCount, setUnlistedCount] = useState(0)
 
   const [loading, setLoading] = useState(false)
-  const [txError, setTxError] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
   const [sessionId, setSessionId] = useState('')
 
   const [snapshotStarted, setSnapshotStarted] = useState(false)
@@ -99,7 +99,7 @@ const TheTool = () => {
   )
 
   const recordSession = useCallback(async () => {
-    if (connectedStakeKey && (hasNoKey || snapshotStarted)) {
+    if (connectedStakeKey && (snapshotStarted || errorMessage)) {
       const payload = {
         stakeKey: connectedStakeKey,
         snapshotStarted,
@@ -108,7 +108,7 @@ const TheTool = () => {
         payoutDone,
         receiptStarted,
         receiptDone,
-        txError,
+        errorMessage,
         settings,
       }
 
@@ -125,7 +125,6 @@ const TheTool = () => {
     }
   }, [
     connectedStakeKey,
-    hasNoKey,
     sessionId,
     snapshotStarted,
     snapshotDone,
@@ -133,7 +132,7 @@ const TheTool = () => {
     payoutDone,
     receiptStarted,
     receiptDone,
-    txError,
+    errorMessage,
     settings,
   ])
 
@@ -153,7 +152,7 @@ const TheTool = () => {
         console.error(error)
 
         const errMsg = error.response.data || error.message
-        setTxError(errMsg)
+        setErrorMessage(errMsg)
         addTranscript('ERROR', errMsg)
 
         if (error.response.status !== 500 && error.response.status !== 400) {
@@ -176,7 +175,7 @@ const TheTool = () => {
         return data
       } catch (error: any) {
         console.error(error)
-        setTxError(error.message)
+        setErrorMessage(error.message)
         addTranscript('ERROR', error.message)
         return await fetchOwningWallet(_assetId, _policyId)
       }
@@ -196,7 +195,7 @@ const TheTool = () => {
       }
     } catch (error: any) {
       console.error(error)
-      setTxError(error.message)
+      setErrorMessage(error.message)
       addTranscript('ERROR', error.message)
       await sleep(1000)
       return await fetchTxConfirmation(_txHash)
@@ -271,7 +270,7 @@ const TheTool = () => {
         )
       } catch (error: any) {
         console.error(error)
-        setTxError(error.message)
+        setErrorMessage(error.message)
         addTranscript('ERROR', error.message)
       }
     }
@@ -476,7 +475,7 @@ const TheTool = () => {
           return await clickAirdrop((difference || 1) * (max / curr))
         } else {
           addTranscript('ERROR', error.message)
-          setTxError(error.message)
+          setErrorMessage(error.message)
         }
       }
 
@@ -532,7 +531,7 @@ const TheTool = () => {
       setReceiptDone(true)
     } catch (error: any) {
       console.error(error)
-      setTxError(error.message)
+      setErrorMessage(error.message)
       addTranscript('ERROR', error.message)
     }
 
