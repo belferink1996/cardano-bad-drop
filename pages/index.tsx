@@ -52,8 +52,10 @@ const Page: NextPage = () => {
   return (
     <div className='px-4 flex flex-col items-center'>
       <div id='home' className='relative w-screen h-[75vh] md:h-[90vh]'>
-        <div className='hidden lg:block animate__animated animate__fadeInRight'>
-          <About />
+        <div className='absolute z-10'>
+          <div className='hidden lg:block animate__animated animate__fadeInRight'>
+            <About />
+          </div>
         </div>
 
         <div className='absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 -z-10'>
