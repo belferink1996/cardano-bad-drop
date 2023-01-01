@@ -307,11 +307,12 @@ const TheTool = () => {
     for (let i = 0; i < policyAssets.length; i++) {
       const { asset: assetId, quantity } = policyAssets[i]
 
+      addTranscript(`Processing asset ${i + 1} / ${policyAssets.length}`, assetId)
+
       if (quantity === '0') {
+        await sleep(100)
         addTranscript(`Asset ${i + 1} / ${policyAssets.length} is burned`, assetId)
       } else {
-        addTranscript(`Processing asset ${i + 1} / ${policyAssets.length}`, assetId)
-
         // this is to improve speed, reduce backend calls
         const foundFetchedWallet = fetchedWallets.find(
           ({ assets }) => !!assets.find(({ unit }) => unit === assetId)
@@ -327,7 +328,10 @@ const TheTool = () => {
 
         const { isContract, stakeKey, walletAddress } = wallet
 
-        if (isContract) {
+        if (walletAddress.indexOf('addr1') !== 0) {
+          await sleep(100)
+          addTranscript(`Asset ${i + 1} / ${policyAssets.length} is not on Cardano`, assetId)
+        } else if (isContract) {
           setListedCount((prev) => prev + 1)
         } else {
           const holderIndex = holders.findIndex((item) => item.stakeKey === stakeKey)
@@ -466,20 +470,23 @@ const TheTool = () => {
         addTranscript('Airdrop done!', "You can now leave the app, don't forget to download the receipt 👍")
         setPayoutDone(true)
       } catch (error: any) {
-        console.error(error?.message || error)
+        const errorMessage = error?.message || ''
+        console.error(errorMessage || error)
 
-        if (error?.message?.indexOf('Maximum transaction size') !== -1) {
+        if (!!errorMessage && errorMessage.indexOf('Maximum transaction size') !== -1) {
           // [Transaction] An error occurred during build: Maximum transaction size of 16384 exceeded. Found: 21861.
-          const splitMessage: string[] = error.message.split(' ')
+          const splitMessage: string[] = errorMessage.split(' ')
           const [max, curr] = splitMessage.filter((str) => !isNaN(Number(str))).map((str) => Number(str))
           // [16384, 21861]
 
+          const newDifference = (difference || 1) * (max / curr)
           console.log('prev difference', difference)
-          console.log('new difference', (difference || 1) * (max / curr))
-          return await clickAirdrop((difference || 1) * (max / curr))
+          console.log('new difference', newDifference)
+
+          return await clickAirdrop(newDifference)
         } else {
-          addTranscript('ERROR', error.message)
-          setErrorMessage(error.message)
+          addTranscript('ERROR', errorMessage)
+          setErrorMessage(errorMessage)
         }
       }
 
