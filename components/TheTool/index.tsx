@@ -598,7 +598,7 @@ const TheTool = () => {
   return (
     <div>
       <div className='flex justify-center text-center md:hidden pt-12'>
-        This tool wasn't designed to be used on mobile,
+        This tool wasn&apos;t designed to be used on mobile,
         <br />
         please visit on a computer.
       </div>

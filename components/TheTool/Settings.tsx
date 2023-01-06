@@ -69,7 +69,7 @@ const Settings = (props: SettingsProps) => {
     <div className='w-full px-1 flex flex-row items-start justify-between'>
       <div className='max-w-[500px] w-full mr-2'>
         <h3 className={'text-lg ' + (disabled ? 'text-gray-700' : '')}>
-          Add the Policy IDs, which the holders thereof, would be included in this airdrop's snapshot.
+          Add the Policy IDs, which the holders thereof, would be included in this airdrop&apos;s snapshot.
         </h3>
 
         {policyIds.map(({ policyId, weight }, idx) => (
