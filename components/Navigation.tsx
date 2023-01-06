@@ -2,15 +2,11 @@ import { Bars3Icon } from '@heroicons/react/24/solid'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useState } from 'react'
-import useScreenSize from '../hooks/useScreenSize'
-import Modal from './layout/Modal'
 
 const Navigation = () => {
   const router = useRouter()
-  const { screenWidth } = useScreenSize()
 
   const [openNav, setOpenNav] = useState(false)
-  const [openModal, setOpenModal] = useState(false)
 
   return (
     <nav>
@@ -48,34 +44,8 @@ const Navigation = () => {
               Tool
             </Link>
           </li>
-          <li onClick={() => setOpenNav(false)}>
-            <button
-              type='button'
-              onClick={() => setOpenModal(true)}
-              className='block py-2 px-3 md:p-0 w-full md:w-auto text-start md:text-center text-sm rounded md:border-0 hover:bg-gray-700 md:hover:bg-transparent hover:text-white'
-            >
-              Help
-            </button>
-          </li>
         </ul>
       </div>
-
-      <Modal
-        title='This tutorial is a bit old, but the approach is almost the same.'
-        open={openModal}
-        onClose={() => setOpenModal(false)}
-      >
-        <iframe
-          className='rounded-xl'
-          width={screenWidth * 0.55}
-          height={screenWidth * 0.55 * 0.5625}
-          allowFullScreen
-          frameBorder='0'
-          allow='accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture'
-          src='https://www.youtube.com/embed/JteReIm9Sv8'
-          title='YouTube video player'
-        ></iframe>
-      </Modal>
     </nav>
   )
 }
