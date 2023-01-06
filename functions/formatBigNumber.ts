@@ -13,7 +13,7 @@ const formatBigNumber = (num: number | string) => {
 
   // billions (b)
   if ((num >= 1000000000 && num <= 999999999999) || (num <= -1000000000 && num >= -999999999999)) {
-    return `${strNum.substring(0, strNum.length - 6)}.${strNum.substring(strNum.length - 6, strNum.length - 5)}b`
+    return `${strNum.substring(0, strNum.length - 9)}.${strNum.substring(strNum.length - 9, strNum.length - 8)}b`
   }
 
   return strNum
