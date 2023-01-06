@@ -69,12 +69,12 @@ const Settings = (props: SettingsProps) => {
     <div className='w-full px-1 flex flex-row items-start justify-between'>
       <div className='max-w-[500px] w-full mr-2'>
         <h3 className={'text-lg ' + (disabled ? 'text-gray-700' : '')}>
-          Add the Policy ID(s) of the NFT collection(s), which their holders will get payed during this airdrop.
+          Add the Policy IDs, which the holders thereof, would be included in this airdrop's snapshot.
         </h3>
 
         {policyIds.map(({ policyId, weight }, idx) => (
           <div key={`pid-${idx}-${policyIds.length}`} className='my-2'>
-            <div className='relative'>
+            <div className='flex items-center'>
               <input
                 placeholder='Policy ID'
                 disabled={disabled}
@@ -92,7 +92,7 @@ const Settings = (props: SettingsProps) => {
                 <button
                   onClick={() => setPolicyIds((prev) => prev.filter((_item, _idx) => _idx !== idx))}
                   className={
-                    'w-8 h-8 p-1.5 absolute right-1.5 top-1/2 -translate-y-1/2 text-sm text-red-400 rounded-full border bg-red-900 border-red-400 hover:text-red-200 hover:bg-red-700 hover:border-red-200 ' +
+                    'w-8 h-8 p-1.5 ml-1 text-sm text-red-400 rounded-full border bg-red-900 border-red-400 hover:text-red-200 hover:bg-red-700 hover:border-red-200 ' +
                     (disabled ? 'hidden' : '')
                   }
                 >
@@ -137,12 +137,12 @@ const Settings = (props: SettingsProps) => {
           <PlusCircleIcon className='w-6 h-6 mr-2' />
           Add another Policy ID
         </button>
-        {policyIds.length > 1 && !disabled ? (
-          <>
-            * Weight = the multiplier for that policy ID, default is 1.
+        {policyIds.length > 1 ? (
+          <p className={'text-xs ' + (disabled ? 'text-gray-700' : '')}>
+            * Weight is the multiplier of that Policy ID. Default is 1.
             <br />
-            (For example: you might want to give pass holders 2x the amount than pfp holders.)
-          </>
+            (For example: you might want to give pass holders 2x the amount than pfp holders)
+          </p>
         ) : null}
       </div>
 
@@ -195,7 +195,7 @@ const Settings = (props: SettingsProps) => {
           </div>
         </div>
 
-        <div className='m-1'>
+        <div className='my-1'>
           <p className={'text-sm ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
             How would you like to determine the payout pool size?
           </p>
@@ -285,7 +285,7 @@ const Settings = (props: SettingsProps) => {
           </div>
         </div>
 
-        <div className='w-full my-1 px-1'>
+        <div className='w-full my-1'>
           <p className={'text-sm ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
             How would you like to split the payout pool between holders?
           </p>
