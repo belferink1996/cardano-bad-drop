@@ -7,7 +7,7 @@ import fromHex from '../../functions/hex/fromHex'
 import ConnectWallet from '../ConnectWallet'
 import TranscriptsViewer, { Transcript } from './TranscriptsViewer'
 import Settings, { SettingsObject } from './Settings'
-import Results from './Results'
+import Results, { Count } from './Results'
 import { PolicyAssetsResponse } from '../../pages/api/policy/[policy_id]'
 import { FetchedOwnerResponse } from '../../pages/api/wallet'
 import { FetchedTxResponse } from '../../pages/api/tx-status'
@@ -18,20 +18,22 @@ interface Balance extends Asset {
   name?: string
 }
 
-type Holder = {
+interface Holder {
   stakeKey: string
   addresses: string[]
-  assets: string[]
+  assets: {
+    [policyId: string]: string[]
+  }
 }
 
-type Payout = {
+interface Payout {
   stakeKey: string
   address: string
   payout: number
   txHash?: string
 }
 
-type SpreadsheetObject = {
+interface SpreadsheetObject {
   value: string | number
   type?: StringConstructor | NumberConstructor
   fontWeight?: string
@@ -67,10 +69,9 @@ const TheTool = () => {
   const [connectedStakeKey, setConnectedStakeKey] = useState('')
   const [tokens, setTokens] = useState<Balance[]>([])
   const [settings, setSettings] = useState<SettingsObject | null>(null)
-  const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
 
-  const [listedCount, setListedCount] = useState(0)
-  const [unlistedCount, setUnlistedCount] = useState(0)
+  const [count, setCount] = useState<Count>({})
+  const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
 
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -87,7 +88,8 @@ const TheTool = () => {
     () =>
       !!(
         settings &&
-        settings.policyId &&
+        settings.policyIds &&
+        settings.policyIds.filter((str) => !!str).length &&
         settings.tokenId &&
         settings.tokenBalance &&
         settings.amountType &&
@@ -269,8 +271,8 @@ const TheTool = () => {
         }
 
         addTranscript(
-          'Define your settings below',
-          "Once the snapshot's initiated, the settings can't be altered."
+          'Define your airdrop settings',
+          "Once the snapshot's initiated, the settings cannot be altered/changed."
         )
       } catch (error: any) {
         console.error(error)
@@ -293,65 +295,87 @@ const TheTool = () => {
 
     const holders: Holder[] = []
     const fetchedWallets: FetchedOwnerResponse[] = []
-    let unlistedCountForPayoutCalculation = 0
+    const unlistedCountsForPayoutCalculation: Record<string, number> = {}
 
-    addTranscript('Processing policy', settings.policyId)
-    const policyAssets = await fetchPolicyAssets(settings.policyId, true)
+    const pIds = settings.policyIds?.filter((str) => !!str) || []
+    for (let pIdx = 0; pIdx < pIds.length; pIdx++) {
+      const { policyId, weight } = pIds[pIdx]
+      unlistedCountsForPayoutCalculation[policyId] = 0
 
-    if (!policyAssets || !policyAssets.length) {
-      setLoading(false)
-      setSnapshotStarted(false)
-      return // for managed error (like blockfrost bad policy id)
-    }
+      addTranscript(`Processing policy ${pIdx + 1} / ${pIds.length}`, policyId)
+      const policyAssets = await fetchPolicyAssets(policyId, true)
 
-    for (let i = 0; i < policyAssets.length; i++) {
-      const { asset: assetId, quantity } = policyAssets[i]
+      if (!policyAssets || !policyAssets.length) {
+        setLoading(false)
+        setSnapshotStarted(false)
+        return // for managed error (like blockfrost bad policy id)
+      }
 
-      addTranscript(`Processing asset ${i + 1} / ${policyAssets.length}`, assetId)
+      for (let aIdx = 0; aIdx < policyAssets.length; aIdx++) {
+        const { asset: assetId, quantity } = policyAssets[aIdx]
 
-      if (quantity === '0') {
-        await sleep(100)
-        addTranscript(`Asset ${i + 1} / ${policyAssets.length} is burned`, assetId)
-      } else {
-        // this is to improve speed, reduce backend calls
-        const foundFetchedWallet = fetchedWallets.find(
-          ({ assets }) => !!assets.find(({ unit }) => unit === assetId)
-        )
+        addTranscript(`Processing asset ${aIdx + 1} / ${policyAssets.length}`, assetId)
 
-        const wallet = foundFetchedWallet || (await fetchOwningWallet(assetId, settings.policyId))
-        if (!wallet) return // for managed error (like bad blockfrost request)
-
-        // this is to improve speed, reduce backend calls
-        if (!foundFetchedWallet) {
-          fetchedWallets.push(wallet)
-        }
-
-        const { isContract, stakeKey, walletAddress } = wallet
-
-        if (walletAddress.indexOf('addr1') !== 0) {
-          await sleep(100)
-          addTranscript(`Asset ${i + 1} / ${policyAssets.length} is not on Cardano`, assetId)
-        } else if (isContract) {
-          setListedCount((prev) => prev + 1)
+        if (quantity === '0') {
+          addTranscript(`Asset ${aIdx + 1} / ${policyAssets.length} is burned`, assetId)
         } else {
-          const holderIndex = holders.findIndex((item) => item.stakeKey === stakeKey)
+          // this is to improve speed, reduce backend calls
+          const foundFetchedWallet = fetchedWallets.find(
+            ({ assets }) => !!assets.find(({ unit }) => unit === assetId)
+          )
 
-          if (holderIndex === -1) {
-            holders.push({
-              stakeKey,
-              addresses: [walletAddress],
-              assets: [assetId],
-            })
-          } else {
-            if (!holders.find((item) => item.addresses.includes(walletAddress))) {
-              holders[holderIndex].addresses.push(walletAddress)
-            }
+          const wallet = foundFetchedWallet || (await fetchOwningWallet(assetId, policyId))
+          if (!wallet) return // for managed error (like bad blockfrost request)
 
-            holders[holderIndex].assets.push(assetId)
+          // this is to improve speed, reduce backend calls
+          if (!foundFetchedWallet) {
+            fetchedWallets.push(wallet)
           }
 
-          setUnlistedCount((prev) => prev + 1)
-          unlistedCountForPayoutCalculation++
+          const { isContract, stakeKey, walletAddress } = wallet
+
+          if (walletAddress.indexOf('addr1') !== 0) {
+            addTranscript(`Asset ${aIdx + 1} / ${policyAssets.length} is not on Cardano`, assetId)
+          } else if (isContract) {
+            setCount((prev) => ({
+              ...prev,
+              [policyId]: {
+                ...prev[policyId],
+                listed: (prev[policyId]?.listed || 0) + 1,
+              },
+            }))
+          } else {
+            const holderIndex = holders.findIndex((item) => item.stakeKey === stakeKey)
+
+            if (holderIndex === -1) {
+              holders.push({
+                stakeKey,
+                addresses: [walletAddress],
+                assets: {
+                  [policyId]: [assetId],
+                },
+              })
+            } else {
+              if (!holders.find((item) => item.addresses.includes(walletAddress))) {
+                holders[holderIndex].addresses.push(walletAddress)
+              }
+
+              if (Array.isArray(holders[holderIndex].assets[policyId])) {
+                holders[holderIndex].assets[policyId]?.push(assetId)
+              } else {
+                holders[holderIndex].assets[policyId] = [assetId]
+              }
+            }
+
+            unlistedCountsForPayoutCalculation[policyId]++
+            setCount((prev) => ({
+              ...prev,
+              [policyId]: {
+                ...prev[policyId],
+                unlisted: (prev[policyId]?.unlisted || 0) + 1,
+              },
+            }))
+          }
         }
       }
     }
@@ -363,20 +387,42 @@ const TheTool = () => {
         ? settings.tokenBalance * (settings.percentAmount / 100)
         : 0
 
-    const sharePerAsset = Math.floor(totalPool / unlistedCountForPayoutCalculation)
+    let divider = 0
+    Object.entries(unlistedCountsForPayoutCalculation).forEach(([policyId, unlistedCount]) => {
+      const policyWeight = settings.policyIds.find((item) => item.policyId === policyId)?.weight || 0
+      divider += unlistedCount * policyWeight
+    })
+
+    const sharePerAsset = Math.floor(totalPool / divider)
 
     setPayoutWallets(
       holders
-        .map(({ stakeKey, addresses, assets }) => ({
-          stakeKey,
-          address: addresses[0],
-          payout: settings.splitType === 'Equal' ? assets.length * sharePerAsset : 0,
-          txHash: '',
-        }))
+        .map(({ stakeKey, addresses, assets }) => {
+          let lovelaceForAssets = 0
+          let lovelaceForTraits = 0
+
+          Object.entries(assets).forEach(([policyId, policyAssets]) => {
+            const policyWeight = settings.policyIds.find((item) => item.policyId === policyId)?.weight || 0
+
+            switch (settings.splitType) {
+              case 'Equal':
+              default:
+                lovelaceForAssets += policyAssets.length * sharePerAsset * policyWeight
+                break
+            }
+          })
+
+          return {
+            stakeKey,
+            address: addresses[0],
+            payout: Math.floor(lovelaceForAssets + lovelaceForTraits),
+            txHash: '',
+          }
+        })
         .sort((a, b) => b.payout - a.payout)
     )
 
-    addTranscript('Snapshot done!')
+    addTranscript('Snapshot done!', 'Verify the results below 👇 and then proceed to build the TX(s)')
     setSnapshotDone(true)
     setLoading(false)
   }, [settings, fetchPolicyAssets, fetchOwningWallet])
@@ -550,62 +596,64 @@ const TheTool = () => {
   }, [settings, payoutWallets])
 
   return (
-    <div className='w-3/4 mx-auto flex flex-col items-center'>
-      <TranscriptsViewer transcripts={transcripts} />
+    <div>
+      <div className='flex justify-center text-center md:hidden pt-12'>
+        This tool wasn't designed to be used on mobile,
+        <br />
+        please visit on a computer.
+      </div>
+      <div className='hidden max-w-[1111px] w-3/4 mx-auto md:flex flex-col items-center'>
+        <TranscriptsViewer transcripts={transcripts} />
 
-      <div className='w-full my-4'>
-        <div className='flex flex-wrap items-center justify-evenly'>
-          <ConnectWallet addTranscript={addTranscript} />
+        <div className='w-full my-4'>
+          <div className='flex flex-wrap items-center justify-evenly'>
+            <ConnectWallet addTranscript={addTranscript} />
 
-          <button
-            type='button'
-            disabled={!connected || !isUserSettingsExist() || snapshotDone || loading}
-            onClick={clickSnapshot}
-            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-          >
-            Snapshot Holders
-          </button>
+            <button
+              type='button'
+              disabled={!connected || !isUserSettingsExist() || snapshotDone || loading}
+              onClick={clickSnapshot}
+              className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+            >
+              Snapshot Holders
+            </button>
 
-          <button
-            type='button'
-            disabled={!connected || !snapshotDone || payoutDone || loading}
-            onClick={() => clickAirdrop()}
-            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-          >
-            Airdrop Tokens
-          </button>
+            <button
+              type='button'
+              disabled={!connected || !snapshotDone || payoutDone || loading}
+              onClick={() => clickAirdrop()}
+              className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+            >
+              Airdrop Tokens
+            </button>
 
-          <button
-            type='button'
-            disabled={!payoutDone || loading}
-            onClick={clickDownloadReceipt}
-            className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
-          >
-            Download Receipt
-          </button>
+            <button
+              type='button'
+              disabled={!payoutDone || loading}
+              onClick={clickDownloadReceipt}
+              className='grow m-1 p-4 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-xl bg-green-900 hover:bg-green-700 bg-opacity-50 hover:bg-opacity-50 hover:text-gray-200 disabled:border border hover:border border-green-700 hover:border-green-700 hover:cursor-pointer'
+            >
+              Download Receipt
+            </button>
+          </div>
+
+          {connectedName.toLowerCase() === 'eternl' ? (
+            <p className='text-center text-lg text-[var(--pink)]'>
+              Eternl is known to cause problems, please consider using a single-address wallet.
+            </p>
+          ) : null}
         </div>
 
-        {connectedName.toLowerCase() === 'eternl' ? (
-          <p className='text-center text-lg text-[var(--pink)]'>
-            Eternl is known to cause problems, please consider using a single-address wallet.
-          </p>
+        <Settings
+          tokens={tokens}
+          disabled={!connected || snapshotDone || loading}
+          callbackSettings={(payload) => setSettings(payload)}
+        />
+
+        {snapshotStarted ? (
+          <Results isLovelace={settings?.tokenId === 'lovelace'} count={count} payoutWallets={payoutWallets} />
         ) : null}
       </div>
-
-      <Settings
-        tokens={tokens}
-        disabled={!connected || snapshotDone || loading}
-        callbackSettings={(payload) => setSettings(payload)}
-      />
-
-      {snapshotStarted ? (
-        <Results
-          isLovelace={settings?.tokenId === 'lovelace'}
-          unlisted={unlistedCount}
-          listed={listedCount}
-          payoutWallets={payoutWallets}
-        />
-      ) : null}
     </div>
   )
 }
