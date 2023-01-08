@@ -7,7 +7,7 @@ import fromHex from '../../functions/hex/fromHex'
 import ConnectWallet from '../ConnectWallet'
 import TranscriptsViewer, { Transcript } from './TranscriptsViewer'
 import Settings, { SettingsObject } from './Settings'
-import Results, { Count } from './Results'
+import Results, { ListingCount, TraitCount } from './Results'
 import { PolicyAssetsResponse } from '../../pages/api/policy/[policy_id]'
 import { FetchedOwnerResponse } from '../../pages/api/wallet'
 import { FetchedTxResponse } from '../../pages/api/tx-status'
@@ -38,6 +38,8 @@ interface SpreadsheetObject {
   type?: StringConstructor | NumberConstructor
   fontWeight?: string
 }
+
+const HOSKY_NFT_POLICY_ID = 'a5bb0e5bb275a573d744a021f9b3bff73595468e002755b447e01559'
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(() => resolve(true), ms))
 
@@ -70,8 +72,9 @@ const TheTool = () => {
   const [tokens, setTokens] = useState<Balance[]>([])
   const [settings, setSettings] = useState<SettingsObject | null>(null)
 
-  const [count, setCount] = useState<Count>({})
   const [payoutWallets, setPayoutWallets] = useState<Payout[]>([])
+  const [listingCount, setListingCount] = useState<ListingCount>({})
+  const [traitCount, setTraitCount] = useState<TraitCount>({})
 
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -89,13 +92,15 @@ const TheTool = () => {
       !!(
         settings &&
         settings.policyIds &&
-        settings.policyIds.filter((str) => !!str).length &&
+        settings.policyIds.length &&
         settings.tokenId &&
         settings.tokenBalance &&
         settings.amountType &&
         ((settings.amountType === 'Fixed' && settings.fixedAmount) ||
           (settings.amountType === 'Percent' && settings.percentAmount)) &&
-        settings.splitType
+        settings.splitType &&
+        settings.splitType === 'EqualPlusTraits' &&
+        settings.rewardingTraits.length
       ),
     [settings]
   )
@@ -170,6 +175,26 @@ const TheTool = () => {
     },
     []
   )
+
+  const fetchAsset = useCallback(async (_assetId: string): Promise<FetchedAssetResponse> => {
+    try {
+      const { data } = await axios.get<FetchedAssetResponse>(`/api/asset/${_assetId}`)
+
+      return data
+    } catch (error: any) {
+      console.error(error)
+
+      const errMsg = error.response.data || error.message
+      setErrorMessage(errMsg)
+      addTranscript('ERROR', errMsg)
+
+      if (error.response.status !== 500 && error.response.status !== 400) {
+        return await fetchAsset(_assetId)
+      } else {
+        return {} as FetchedAssetResponse
+      }
+    }
+  }, [])
 
   const fetchOwningWallet = useCallback(
     async (_assetId: string, _policyId: string): Promise<FetchedOwnerResponse> => {
@@ -255,10 +280,10 @@ const TheTool = () => {
 
               if (Number(balance.quantity) > 1) {
                 if (assetId.indexOf(pId) === 0) {
-                  const { data } = await axios.get<FetchedAssetResponse>(`/api/asset/${assetId}`)
+                  const asset = await fetchAsset(assetId)
 
                   balance.name =
-                    data.metadata?.name || data.onchain_metadata?.name || fromHex(data?.asset_name || '')
+                    asset.metadata?.name || asset.onchain_metadata?.name || fromHex(asset?.asset_name || '')
 
                   setTokens((prev) => [...prev, balance])
                 }
@@ -294,10 +319,12 @@ const TheTool = () => {
     setSnapshotStarted(true)
 
     const holders: Holder[] = []
+    const fetchedAssets: FetchedAssetResponse[] = []
     const fetchedWallets: FetchedOwnerResponse[] = []
     const unlistedCountsForPayoutCalculation: Record<string, number> = {}
+    const traitCounts: Record<string, number> = {}
 
-    const pIds = settings.policyIds?.filter((str) => !!str) || []
+    const pIds = settings.policyIds || []
     for (let pIdx = 0; pIdx < pIds.length; pIdx++) {
       const { policyId, weight } = pIds[pIdx]
       unlistedCountsForPayoutCalculation[policyId] = 0
@@ -337,7 +364,7 @@ const TheTool = () => {
           if (walletAddress.indexOf('addr1') !== 0) {
             addTranscript(`Asset ${aIdx + 1} / ${policyAssets.length} is not on Cardano`, assetId)
           } else if (isContract) {
-            setCount((prev) => ({
+            setListingCount((prev) => ({
               ...prev,
               [policyId]: {
                 ...prev[policyId],
@@ -346,6 +373,11 @@ const TheTool = () => {
             }))
           } else {
             const holderIndex = holders.findIndex((item) => item.stakeKey === stakeKey)
+
+            if (settings.splitType === 'EqualPlusTraits') {
+              const asset = await fetchAsset(assetId)
+              fetchedAssets.push(asset)
+            }
 
             if (holderIndex === -1) {
               holders.push({
@@ -368,7 +400,7 @@ const TheTool = () => {
             }
 
             unlistedCountsForPayoutCalculation[policyId]++
-            setCount((prev) => ({
+            setListingCount((prev) => ({
               ...prev,
               [policyId]: {
                 ...prev[policyId],
@@ -393,29 +425,74 @@ const TheTool = () => {
       divider += unlistedCount * policyWeight
     })
 
-    const sharePerAsset = Math.floor(totalPool / divider)
+    const sharePerAsset = totalPool / divider
 
     setPayoutWallets(
       holders
         .map(({ stakeKey, addresses, assets }) => {
-          let lovelaceForAssets = 0
-          let lovelaceForTraits = 0
+          let amountForAssets = 0
+          let amountForTraits = 0
 
           Object.entries(assets).forEach(([policyId, policyAssets]) => {
             const policyWeight = settings.policyIds.find((item) => item.policyId === policyId)?.weight || 0
 
             switch (settings.splitType) {
-              case 'Equal':
-              default:
-                lovelaceForAssets += policyAssets.length * sharePerAsset * policyWeight
+              case 'Equal': {
+                amountForAssets += policyAssets.length * sharePerAsset * policyWeight
                 break
+              }
+
+              case 'EqualPlusTraits': {
+                amountForAssets += policyAssets.length * sharePerAsset * policyWeight
+
+                for (const assetId of policyAssets) {
+                  const asset = fetchedAssets.find((asset) => asset.asset === assetId) as FetchedAssetResponse
+
+                  let attributes: Record<string, any> =
+                    asset.onchain_metadata?.attributes || asset.onchain_metadata || asset.metadata || {}
+
+                  if (policyId === HOSKY_NFT_POLICY_ID) {
+                    const newAttributes: typeof attributes = {}
+                    attributes['-----Traits-----'].forEach((obj: Record<string, string>) => {
+                      const [category, trait] = Object(obj).entries()[0]
+                      newAttributes[category] = trait
+                    })
+                    attributes = newAttributes
+                  }
+
+                  settings.rewardingTraits.forEach(({ category, trait, amount }) => {
+                    const label = `${category} / ${trait}`
+                    if (!traitCounts[label]) {
+                      traitCounts[label] = 0
+                    }
+
+                    if (attributes[category] === trait) {
+                      amountForTraits += amount * (settings.tokenId === 'lovelace' ? ONE_MILLION : 1)
+                      traitCounts[label] += 1
+
+                      setTraitCount((prev) => ({
+                        ...prev,
+                        [label]: prev[label] ? prev[label] + 1 : 1,
+                      }))
+                    }
+                  })
+                }
+
+                break
+              }
+
+              default: {
+                amountForAssets = 0
+                amountForTraits = 0
+                break
+              }
             }
           })
 
           return {
             stakeKey,
             address: addresses[0],
-            payout: Math.floor(lovelaceForAssets + lovelaceForTraits),
+            payout: Math.floor(amountForAssets + amountForTraits),
             txHash: '',
           }
         })
@@ -597,12 +674,12 @@ const TheTool = () => {
 
   return (
     <div>
-      <div className='flex justify-center text-center md:hidden pt-12'>
+      <div className='flex justify-center text-center md:hidden pt-10'>
         This tool wasn&apos;t designed to be used on mobile,
         <br />
         please visit on a computer.
       </div>
-      <div className='hidden max-w-[1111px] w-3/4 mx-auto md:flex flex-col items-center'>
+      <div className='hidden max-w-[1200px] w-full mx-auto px-10 md:flex flex-col items-center'>
         <TranscriptsViewer transcripts={transcripts} />
 
         <div className='w-full my-4'>
@@ -651,7 +728,12 @@ const TheTool = () => {
         />
 
         {snapshotStarted ? (
-          <Results isLovelace={settings?.tokenId === 'lovelace'} count={count} payoutWallets={payoutWallets} />
+          <Results
+            isLovelace={settings?.tokenId === 'lovelace'}
+            payoutWallets={payoutWallets}
+            listingCount={listingCount}
+            traitCount={traitCount}
+          />
         ) : null}
       </div>
     </div>

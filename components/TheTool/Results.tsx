@@ -8,45 +8,69 @@ export interface Payout {
   txHash?: string
 }
 
-export interface Count {
+export interface ListingCount {
   [policyId: string]: {
     listed: number
     unlisted: number
   }
 }
 
+export interface TraitCount {
+  [key: string]: number
+}
+
 export interface ResultsProps {
   isLovelace: boolean
-  count: Count
   payoutWallets: Payout[]
+  listingCount: ListingCount
+  traitCount: TraitCount
 }
 
 const Results = (props: ResultsProps) => {
-  const { isLovelace, count, payoutWallets } = props
+  const { isLovelace, payoutWallets, listingCount, traitCount } = props
 
   return (
     <div className='overflow-clip w-screen mt-4 flex flex-col items-center border border-r-0 border-l-0 border-b-0'>
       <table className='my-4'>
         <thead>
           <tr>
-            <th className='text-start'>Policy ID</th>
-            <th className='px-1 text-start'>Listed</th>
-            <th className='px-1 text-start'>Unlisted</th>
+            <th className='text-sm text-start'>Policy ID</th>
+            <th className='px-1 text-sm text-start'>Listed</th>
+            <th className='px-1 text-sm text-start'>Unlisted</th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(count).map(([pId, obj]) => (
+          {Object.entries(listingCount).map(([pId, obj]) => (
             <tr key={`res-listings-${pId}`}>
-              <td className='text-start'>{pId}</td>
-              <td className='text-center'>{obj.listed}</td>
-              <td className='text-center'>{obj.unlisted}</td>
+              <td className='text-xs text-start'>{pId}</td>
+              <td className='text-xs text-center'>{obj.listed}</td>
+              <td className='text-xs text-center'>{obj.unlisted}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
+      {Object.entries(traitCount).length ? (
+        <table className='my-4'>
+          <thead>
+            <tr>
+              <th className='text-sm text-start'>Attribute</th>
+              <th className='px-1 text-sm text-start'>Count (unlisted)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(traitCount).map(([str, num]) => (
+              <tr key={`res-traits-${str}`}>
+                <td className='text-xs text-start'>{str}</td>
+                <td className='text-xs text-center'>{num}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : null}
+
       {payoutWallets.length ? (
-        <table>
+        <table className='my-4'>
           <thead>
             <tr>
               <th className='text-sm font-normal'>Payout</th>

@@ -4,18 +4,18 @@ import { useEffect, useState } from 'react'
 import { ONE_MILLION } from '../../constants'
 import formatBigNumber from '../../functions/formatBigNumber'
 
-interface Balance extends Asset {
-  name?: string
-}
-
-export type AmountType = 'Fixed' | 'Percent' | ''
-export type SplitType = 'Equal' | ''
-
 export interface PolicySettingsObject {
   policyId: string
   weight: number
 }
+export interface TraitSettingsObject {
+  category: string
+  trait: string
+  amount: number
+}
 
+export type AmountType = 'Fixed' | 'Percent' | ''
+export type SplitType = 'Equal' | 'EqualPlusTraits' | ''
 export interface SettingsObject {
   policyIds: PolicySettingsObject[]
 
@@ -28,8 +28,12 @@ export interface SettingsObject {
   percentAmount: number
 
   splitType: SplitType
+  rewardingTraits: TraitSettingsObject[]
 }
 
+interface Balance extends Asset {
+  name?: string
+}
 export interface SettingsProps {
   disabled: boolean
   tokens: Balance[]
@@ -39,7 +43,19 @@ export interface SettingsProps {
 const Settings = (props: SettingsProps) => {
   const { disabled, tokens, callbackSettings } = props
 
-  const [policyIds, setPolicyIds] = useState<PolicySettingsObject[]>([{ policyId: '', weight: 1 }])
+  const [policyIds, setPolicyIds] = useState<PolicySettingsObject[]>([
+    {
+      policyId: '',
+      weight: 1,
+    },
+  ])
+  const [rewardingTraits, setRewardingTraits] = useState<TraitSettingsObject[]>([
+    {
+      category: '',
+      trait: '',
+      amount: 0,
+    },
+  ])
 
   const [openTokenSelection, setOpenTokenSelection] = useState(false)
   const [tokenId, setSelectedId] = useState('')
@@ -54,7 +70,7 @@ const Settings = (props: SettingsProps) => {
 
   useEffect(() => {
     callbackSettings({
-      policyIds,
+      policyIds: policyIds.filter((str) => !!str),
       tokenId,
       tokenName,
       tokenBalance,
@@ -62,8 +78,19 @@ const Settings = (props: SettingsProps) => {
       fixedAmount,
       percentAmount,
       splitType,
+      rewardingTraits: rewardingTraits.filter((obj) => !!obj.category && !!obj.trait && !!obj.amount),
     })
-  }, [policyIds, tokenId, tokenName, tokenBalance, amountType, fixedAmount, percentAmount, splitType])
+  }, [
+    policyIds,
+    tokenId,
+    tokenName,
+    tokenBalance,
+    amountType,
+    fixedAmount,
+    percentAmount,
+    splitType,
+    rewardingTraits,
+  ])
 
   return (
     <div className='w-full px-1 flex flex-row items-start justify-between'>
@@ -100,25 +127,23 @@ const Settings = (props: SettingsProps) => {
                 </button>
               ) : null}
             </div>
-            {policyIds.length > 1 ? (
-              <div className='flex items-center'>
-                <label className={'mr-2 ml-4 ' + (disabled ? 'text-gray-700' : '')}>Weight:</label>
-                <input
-                  disabled={disabled}
-                  value={String(weight)}
-                  onChange={(e) =>
-                    setPolicyIds((prev) => {
-                      const payload = [...prev]
-                      const v = Number(e.target.value)
-                      if (isNaN(v)) return payload
-                      payload[idx] = { policyId: payload[idx].policyId, weight: v }
-                      return payload
-                    })
-                  }
-                  className='w-14 my-1 p-3 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 disabled:placeholder:text-gray-700 rounded-lg bg-gray-900 border border-gray-700 text-sm hover:bg-gray-700 hover:border-gray-500 hover:text-white hover:placeholder:text-white'
-                />
-              </div>
-            ) : null}
+            <div className='flex items-center'>
+              <label className={'mr-2 ml-4 ' + (disabled ? 'text-gray-700' : '')}>Weight:</label>
+              <input
+                disabled={disabled}
+                value={String(weight)}
+                onChange={(e) =>
+                  setPolicyIds((prev) => {
+                    const payload = [...prev]
+                    const v = Number(e.target.value)
+                    if (isNaN(v)) return payload
+                    payload[idx] = { policyId: payload[idx].policyId, weight: v }
+                    return payload
+                  })
+                }
+                className='w-20 my-0.5 p-3 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 disabled:placeholder:text-gray-700 rounded-lg bg-gray-900 border border-gray-700 text-sm hover:bg-gray-700 hover:border-gray-500 hover:text-white hover:placeholder:text-white'
+              />
+            </div>
           </div>
         ))}
 
@@ -137,13 +162,11 @@ const Settings = (props: SettingsProps) => {
           <PlusCircleIcon className='w-6 h-6 mr-2' />
           Add another Policy ID
         </button>
-        {policyIds.length > 1 ? (
-          <p className={'text-xs ' + (disabled ? 'text-gray-700' : '')}>
-            * Weight is the multiplier of that Policy ID. Default is 1.
-            <br />
-            (For example: you might want to give pass holders 2x the amount than pfp holders)
-          </p>
-        ) : null}
+        <p className={'text-xs ' + (disabled ? 'text-gray-700' : '')}>
+          * Weight is the multiplier of that Policy ID. Default is 1.
+          <br />
+          (For example: you might want to give pass holders 2x the amount than pfp holders)
+        </p>
       </div>
 
       <div className='max-w-[500px] w-full ml-2'>
@@ -238,7 +261,7 @@ const Settings = (props: SettingsProps) => {
             </label>
           </div>
 
-          <div className='my-1'>
+          <div>
             <input
               placeholder='Amount Value'
               disabled={disabled || !amountType}
@@ -285,7 +308,11 @@ const Settings = (props: SettingsProps) => {
           </div>
         </div>
 
-        <div className='w-full my-1'>
+        <div
+          className={'w-full h-0.5 my-2 rounded-full ' + (disabled || !tokenId ? 'bg-gray-700' : 'bg-gray-400')}
+        />
+
+        <div className='w-full'>
           <p className={'text-sm ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
             How would you like to split the payout pool between holders?
           </p>
@@ -317,6 +344,23 @@ const Settings = (props: SettingsProps) => {
               <input
                 type='radio'
                 name='split-type'
+                value='EqualPlusTraits'
+                disabled={disabled || !tokenId}
+                onChange={(e) => setSplitType(e.target.value as 'EqualPlusTraits')}
+                checked={splitType === 'EqualPlusTraits'}
+                className='disabled:opacity-50'
+              />
+              <span className='ml-2 text-sm'>Equal Splits + Traits</span>
+            </label>
+            <label
+              className={
+                'flex items-center ' +
+                (disabled || !tokenId ? 'text-gray-700 cursor-not-allowed' : 'hover:text-white cursor-pointer')
+              }
+            >
+              <input
+                type='radio'
+                name='split-type'
                 value=''
                 disabled={true}
                 onChange={(e) => setSplitType(e.target.value as '')}
@@ -327,10 +371,106 @@ const Settings = (props: SettingsProps) => {
             </label>
           </div>
 
-          {!!splitType ? (
-            <p className={'text-sm ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
-              {splitType === 'Equal' ? 'Tokens per NFT = Total Amount / Unlisted Assets' : ''}
-            </p>
+          {splitType ? (
+            <div>
+              {splitType === 'Equal' ? (
+                <p className={'mt-1 text-xs ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
+                  Coins per NFT = Balance / Unlisted NFTs
+                </p>
+              ) : splitType === 'EqualPlusTraits' ? (
+                <div>
+                  <p className={'mt-1 text-xs ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
+                    Coins per NFT = (Balance / Unlisted NFTs) + (Trait Count * Trait Coins)
+                  </p>
+                  <p className={'mt-1 text-xs ' + (disabled || !tokenId ? 'text-gray-700' : '')}>
+                    * These rewards are not included, but additional (!) to the total balance.
+                    <br />
+                    Note: trait categories & values are case-sensitive!
+                  </p>
+
+                  <div className='w-full'>
+                    {rewardingTraits.map(({ category, trait, amount }, idx) => (
+                      <div key={`pid-${idx}-${rewardingTraits.length}`} className='my-2'>
+                        <div className='flex items-center justify-between'>
+                          <input
+                            placeholder='Category (ex. Eyewear)'
+                            disabled={disabled}
+                            value={category}
+                            onChange={(e) =>
+                              setRewardingTraits((prev) => {
+                                const payload = [...prev]
+                                payload[idx] = { ...(payload[idx] || {}), category: e.target.value }
+                                return payload
+                              })
+                            }
+                            className='flex-1 my-0.5 mr-1 p-3 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 disabled:placeholder:text-gray-700 rounded-lg bg-gray-900 border border-gray-700 text-sm hover:bg-gray-700 hover:border-gray-500 hover:text-white hover:placeholder:text-white'
+                          />
+                          <input
+                            placeholder='Trait (ex. 3D Glasses)'
+                            disabled={disabled}
+                            value={trait}
+                            onChange={(e) =>
+                              setRewardingTraits((prev) => {
+                                const payload = [...prev]
+                                payload[idx] = { ...(payload[idx] || {}), trait: e.target.value }
+                                return payload
+                              })
+                            }
+                            className='flex-1 my-0.5 mr-1 p-3 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 disabled:placeholder:text-gray-700 rounded-lg bg-gray-900 border border-gray-700 text-sm hover:bg-gray-700 hover:border-gray-500 hover:text-white hover:placeholder:text-white'
+                          />
+                          {rewardingTraits.length > 1 ? (
+                            <button
+                              onClick={() =>
+                                setRewardingTraits((prev) => prev.filter((_item, _idx) => _idx !== idx))
+                              }
+                              className={
+                                'w-8 h-8 p-1.5 text-sm text-red-400 rounded-full border bg-red-900 border-red-400 hover:text-red-200 hover:bg-red-700 hover:border-red-200 ' +
+                                (disabled ? 'hidden' : '')
+                              }
+                            >
+                              <TrashIcon />
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className='flex items-center'>
+                          <label className={'mr-2 ml-4 ' + (disabled ? 'text-gray-700' : '')}>Coins:</label>
+                          <input
+                            className='w-20 my-0.5 p-3 disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 disabled:placeholder:text-gray-700 rounded-lg bg-gray-900 border border-gray-700 text-sm hover:bg-gray-700 hover:border-gray-500 hover:text-white hover:placeholder:text-white'
+                            disabled={disabled}
+                            value={String(amount)}
+                            onChange={(e) =>
+                              setRewardingTraits((prev) => {
+                                const payload = [...prev]
+                                const v = Number(e.target.value)
+                                if (isNaN(v)) return payload
+                                payload[idx] = { ...(payload[idx] || {}), amount: v }
+                                return payload
+                              })
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+
+                    <button
+                      type='button'
+                      disabled={disabled}
+                      onClick={() =>
+                        setRewardingTraits((prev) => {
+                          const payload = [...prev]
+                          payload.push({ category: '', trait: '', amount: 0 })
+                          return payload
+                        })
+                      }
+                      className='w-fit my-1 p-3 flex items-center justify-between disabled:cursor-not-allowed disabled:bg-gray-900 disabled:bg-opacity-50 disabled:border-gray-800 disabled:text-gray-700 rounded-lg bg-gray-900 hover:bg-gray-700 text-sm hover:text-white border border-gray-700 hover:border-gray-500'
+                    >
+                      <PlusCircleIcon className='w-6 h-6 mr-2' />
+                      Add another attribute
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
