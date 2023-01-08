@@ -20,7 +20,7 @@ const data = [
 
 const Footer = () => {
   return (
-    <footer className='flex flex-col items-center justify-center pt-15 pb-5 bg-black bg-opacity-50'>
+    <footer className='flex flex-col items-center justify-center pt-10 pb-5 bg-black bg-opacity-50'>
       <h5 className='text-md'>powered by</h5>
 
       <div className='flex items-center'>
